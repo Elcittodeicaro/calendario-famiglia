@@ -1,4 +1,5 @@
 [build]
+  command = "node scripts/stamp.mjs"
   publish = "public"
   functions = "netlify/functions"
 
@@ -8,6 +9,11 @@
     X-Robots-Tag = "noindex, nofollow"
     Referrer-Policy = "no-referrer"
     X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-store"
 
 [[headers]]
   for = "/sw.js"

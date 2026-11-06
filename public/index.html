@@ -819,8 +819,30 @@ function start() {
 }
 
 // ---------- aggiornamento automatico ----------
+// Dati: ogni 30 secondi e quando riapri l'app.
+// App: se è stata pubblicata una versione nuova, la pagina si ricarica da sola.
+const APP_VERSION = '__APP_VERSION__';
+async function checkUpdate() {
+  if (APP_VERSION.startsWith('__') || anySheetOpen()) return;
+  try {
+    const r = await fetch('/version.json', { cache: 'no-store' });
+    const { v } = await r.json();
+    let last = 0; try { last = +sessionStorage.getItem('cal.reload') || 0; } catch {}
+    if (v && v !== APP_VERSION && Date.now() - last > 60000) {
+      try { sessionStorage.setItem('cal.reload', String(Date.now())); } catch {}
+      location.reload();
+    }
+  } catch {}
+}
 setInterval(() => { if (st.code && document.visibilityState === 'visible' && !anySheetOpen()) load(true); }, 30000);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && st.code && !anySheetOpen()) load(true); });
+setInterval(() => { if (document.visibilityState === 'visible') checkUpdate(); }, 300000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  checkUpdate();
+  if (st.code && !anySheetOpen()) load(true);
+});
+window.addEventListener('pageshow', e => { if (e.persisted) checkUpdate(); });
+checkUpdate();
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 
