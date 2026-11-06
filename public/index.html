@@ -51,10 +51,29 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .sync-dot{position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--ok);opacity:0;transition:opacity .2s}
 .syncing .sync-dot{opacity:1;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.25}}
-.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--soft);border-radius:10px;padding:3px;margin-top:10px}
+.seg{display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--soft);border-radius:10px;padding:3px;margin-top:10px}
 .seg button{padding:6px;border-radius:8px;font-size:15px;font-weight:600;color:var(--muted)}
 .seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 body[data-view=agenda] .nav{display:none}
+body[data-view=week] .title-row h1{font-size:21px;margin:0 2px}
+
+/* ---------- settimana ---------- */
+.wk-wrap{padding:0 14px 130px;touch-action:pan-y}
+.wk-day{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.wk-day:last-child{border-bottom:0}
+.wk-date{width:44px;flex:none;display:flex;flex-direction:column;align-items:center;padding-top:2px}
+.wk-wd{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.wk-n{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-size:21px;font-weight:700;font-variant-numeric:tabular-nums}
+.wk-day.today .wk-wd,.wk-day.today .wk-n{color:var(--accent)}
+.wk-day.sel .wk-n{background:var(--sel);color:var(--selInk)}
+.wk-day.today.sel .wk-n{background:var(--accent);color:#fff}
+.wk-day.past .wk-list{opacity:.55}
+.wk-list{flex:1;min-width:0}
+.wk-list .ev{margin:0 0 6px;padding:9px 12px}
+.wk-list .ev:last-child{margin-bottom:0}
+.wk-list .ev-note{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wk-free{width:100%;text-align:left;color:var(--muted);font-size:15px;padding:10px 12px;border-radius:12px;border:1.5px dashed var(--line);display:flex;justify-content:space-between}
+.wk-free b{font-weight:600}
 
 /* ---------- mese ---------- */
 .weekdays{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 8px 2px;font-size:12px;font-weight:600;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.04em}
@@ -200,7 +219,8 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
     </div>
     <div class="seg">
       <button data-view="month">Mese</button>
-      <button data-view="agenda">Prossimi impegni</button>
+      <button data-view="week">Settimana</button>
+      <button data-view="agenda">Prossimi</button>
     </div>
   </header>
 
@@ -213,6 +233,7 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
         <div id="dayEvents"></div>
       </div>
     </section>
+    <section id="weekView" class="wk-wrap" hidden></section>
     <section id="agendaView" class="ag-wrap" hidden>
       <div id="agendaList"></div>
     </section>
@@ -377,6 +398,7 @@ const netMsg = err => (err && err.message && !/fetch|network|load/i.test(err.mes
 
 function neededMonths() {
   if (st.view === 'month') return [-1, 0, 1].map(n => mkey(...shiftMonth(st.y, st.m, n)));
+  if (st.view === 'week') { const a = pd(weekStart(st.sel)); return [0, 1].map(n => mkey(...shiftMonth(a.getFullYear(), a.getMonth(), n))); }
   const t = new Date();
   return [0, 1, 2].map(n => mkey(...shiftMonth(t.getFullYear(), t.getMonth(), n)));
 }
@@ -501,12 +523,31 @@ function renderAgenda() {
     ? days.map(d => `<h3 class="ag-day${d === from ? ' is-today' : ''}">${esc(dayLabel(d))}</h3>${occ[d].map(evHtml).join('')}`).join('')
     : '<div class="empty">Niente in programma nei prossimi due mesi.</div>';
 }
+function weekStart(s) { return addDays(s, -((pd(s).getDay() + 6) % 7)); }
+function renderWeek() {
+  const a = weekStart(st.sel), b = addDays(a, 6), da = pd(a), db = pd(b);
+  const yr = db.getFullYear() !== new Date().getFullYear() ? ` <span>${db.getFullYear()}</span>` : '';
+  $('#monthTitle').innerHTML = (da.getMonth() === db.getMonth()
+    ? `${da.getDate()}–${db.getDate()} ${MONTHS[db.getMonth()]}`
+    : `${da.getDate()} ${MONTHS[da.getMonth()].slice(0, 3)} – ${db.getDate()} ${MONTHS[db.getMonth()].slice(0, 3)}`) + yr;
+  const occ = occurrences(a, b), today = todayStr();
+  let html = '';
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(a, i), dd = pd(d), list = occ[d] || [];
+    html += `<div class="wk-day${d === today ? ' today' : ''}${d === st.sel ? ' sel' : ''}${d < today ? ' past' : ''}">
+      <button class="wk-date" data-sel="${d}"><span class="wk-wd">${WD_SHORT[dd.getDay()]}</span><span class="wk-n">${dd.getDate()}</span></button>
+      <div class="wk-list">${list.length ? list.map(evHtml).join('') : `<button class="wk-free" data-add="${d}"><span>Libero</span><b>+</b></button>`}</div>
+    </div>`;
+  }
+  $('#weekView').innerHTML = html;
+}
 function render() {
   document.body.dataset.view = st.view;
   $$('.seg button').forEach(b => b.classList.toggle('on', b.dataset.view === st.view));
   $('#monthView').hidden = st.view !== 'month';
+  $('#weekView').hidden = st.view !== 'week';
   $('#agendaView').hidden = st.view !== 'agenda';
-  st.view === 'month' ? renderMonth() : renderAgenda();
+  if (st.view === 'month') renderMonth(); else if (st.view === 'week') renderWeek(); else renderAgenda();
 }
 
 // ---------- navigazione ----------
@@ -516,8 +557,20 @@ function goMonth(n) {
   st.sel = (t.getFullYear() === st.y && t.getMonth() === st.m) ? todayStr() : ds(new Date(st.y, st.m, 1));
   render(); load();
 }
-$('#prev').onclick = () => goMonth(-1);
-$('#next').onclick = () => goMonth(1);
+function goWeek(n) {
+  const t = todayStr(), a = addDays(weekStart(st.sel), 7 * n);
+  st.sel = weekStart(t) === a ? t : a;
+  const d = pd(st.sel); st.y = d.getFullYear(); st.m = d.getMonth();
+  render(); load(); window.scrollTo(0, 0);
+}
+const step = n => (st.view === 'week' ? goWeek(n) : goMonth(n));
+$('#prev').onclick = () => step(-1);
+$('#next').onclick = () => step(1);
+$('#weekView').addEventListener('click', e => {
+  const b = e.target.closest('[data-sel]'); if (!b) return;
+  st.sel = b.dataset.sel; const d = pd(st.sel); st.y = d.getFullYear(); st.m = d.getMonth();
+  renderWeek();
+});
 $('#todayBtn').onclick = () => {
   const t = new Date(); st.y = t.getFullYear(); st.m = t.getMonth(); st.sel = todayStr();
   render(); load(); window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -530,16 +583,19 @@ $('#grid').addEventListener('click', e => {
   if (dd.getMonth() !== st.m) { st.y = dd.getFullYear(); st.m = dd.getMonth(); render(); load(); } else render();
 });
 let tx = null, ty = null;
-$('#grid').addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
-$('#grid').addEventListener('touchend', e => {
-  if (tx == null) return;
-  const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = null;
-  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) goMonth(dx < 0 ? 1 : -1);
-}, { passive: true });
+['#grid', '#weekView'].forEach(sel => {
+  $(sel).addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+  $(sel).addEventListener('touchend', e => {
+    if (tx == null) return;
+    const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) step(dx < 0 ? 1 : -1);
+  }, { passive: true });
+});
 document.addEventListener('click', e => {
   const ev = e.target.closest('.ev');
   if (ev) { const found = findEvent(ev.dataset.key); if (found) openEditor(found, ev.dataset.occ); return; }
-  if (e.target.closest('[data-add]')) openEditor(null);
+  const add = e.target.closest('[data-add]');
+  if (add) openEditor(null, null, add.dataset.add || null);
 });
 $('#addBtn').onclick = () => openEditor(null);
 
@@ -586,11 +642,11 @@ F.start.onchange = () => {
     F.end.value = h < 23 ? `${pad(h + 1)}:${pad(m)}` : '23:59';
   }
 };
-function openEditor(ev, occ) {
+function openEditor(ev, occ, date) {
   editing = { ev, occ: occ || (ev && ev.date) };
   $('#evSheetTitle').textContent = ev ? 'Modifica' : 'Nuovo impegno';
   F.what.value = ev ? ev.title : '';
-  F.date.value = ev ? ev.date : (st.view === 'month' ? st.sel : todayStr());
+  F.date.value = ev ? ev.date : (date || (st.view === 'agenda' ? todayStr() : st.sel));
   F.allDay.checked = ev ? !!ev.allDay : false;
   F.start.value = ev && ev.start ? ev.start : '09:00';
   F.end.value = ev && ev.end ? ev.end : (ev ? '' : '10:00');

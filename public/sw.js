@@ -1,6 +1,6 @@
 // Permette di aprire l'app anche senza rete (mostra gli ultimi dati salvati).
 // Prima prova sempre la rete, così gli aggiornamenti arrivano subito.
-const CACHE = 'calendario-v1';
+const CACHE = 'calendario-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-180.png', '/icon-192.png'];
 
 self.addEventListener('install', e => {
