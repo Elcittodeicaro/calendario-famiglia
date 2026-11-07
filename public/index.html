@@ -51,7 +51,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .sync-dot{position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--ok);opacity:0;transition:opacity .2s}
 .syncing .sync-dot{opacity:1;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.25}}
-.seg{display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--soft);border-radius:10px;padding:3px;margin-top:10px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);background:var(--soft);border-radius:10px;padding:3px;margin-top:10px}
 .seg button{padding:6px;border-radius:8px;font-size:15px;font-weight:600;color:var(--muted)}
 .seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 body[data-view=agenda] .nav{display:none}
@@ -116,6 +116,29 @@ body[data-view=week] .title-row h1{font-size:21px;margin:0 2px}
 .fchip i{width:8px;height:8px;border-radius:50%;background:var(--c)}
 .fchip.on{background:var(--ink);color:var(--bg)}
 a.btn-wide{text-decoration:none;color:inherit;box-sizing:border-box}
+.fchip small{font-size:12px;opacity:.7}
+
+/* ---------- liste ---------- */
+body[data-view=lists] .nav,body[data-view=lists] #todayBtn,body[data-view=lists] .filters,body[data-view=lists] .fab{display:none}
+.ls-wrap{padding:2px 14px 130px}
+.ls-tabs{display:flex;gap:6px;overflow-x:auto;margin:10px -14px 12px;padding:0 14px;scrollbar-width:none}
+.ls-tabs::-webkit-scrollbar{display:none}
+.ls-add{display:flex;gap:8px;background:var(--card);border-radius:12px;padding:6px 6px 6px 14px;align-items:center;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.ls-add input{flex:1;min-width:0;border:0;background:transparent;outline:none;font-size:16px;padding:8px 0}
+.ls-add button{width:38px;height:38px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;flex:none}
+.ls-add button svg{width:20px;height:20px}
+.items{background:var(--card);border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.item{display:flex;align-items:center;gap:12px;padding:4px 14px;border-bottom:1px solid var(--line);min-height:50px}
+.item:last-child{border-bottom:0}
+.check{width:26px;height:26px;border-radius:50%;border:2px solid var(--muted);flex:none;display:grid;place-items:center;color:#fff;font-size:15px;font-weight:800}
+.item.done .check{background:var(--ok);border-color:var(--ok)}
+.item .txt{flex:1;min-width:0;overflow-wrap:anywhere;text-align:left;font-size:16px;padding:10px 0}
+.item.done .txt{color:var(--muted);text-decoration:line-through}
+.ls-sub{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:20px 4px 6px}
+.ls-sub button{color:var(--accent);text-transform:none;letter-spacing:0;font-weight:600;font-size:14px}
+.ls-actions{display:flex;gap:8px;margin-top:24px}
+.ls-actions button{flex:1;padding:11px;border-radius:12px;background:var(--soft);font-weight:600;font-size:15px}
+#promptForm .group{margin:6px 16px 4px}
 .ev-note{font-size:14px;color:var(--muted);margin-top:5px;white-space:pre-wrap;overflow-wrap:anywhere}
 .empty{color:var(--muted);text-align:center;padding:26px 10px;font-size:15px}
 .link{color:var(--ink);font-weight:600;margin-top:8px;padding:8px 14px;border-radius:99px;background:var(--soft)}
@@ -229,6 +252,7 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
       <button data-view="month">Mese</button>
       <button data-view="week">Settimana</button>
       <button data-view="agenda">Prossimi</button>
+      <button data-view="lists">Liste</button>
     </div>
     <div class="filters" id="filters"></div>
   </header>
@@ -245,6 +269,14 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
     <section id="weekView" class="wk-wrap" hidden></section>
     <section id="agendaView" class="ag-wrap" hidden>
       <div id="agendaList"></div>
+    </section>
+    <section id="listsView" class="ls-wrap" hidden>
+      <div class="ls-tabs" id="listTabs"></div>
+      <form class="ls-add" id="addItemForm" autocomplete="off">
+        <input name="entry" placeholder="Aggiungi…" enterkeyhint="send" autocapitalize="sentences" maxlength="200">
+        <button type="submit" aria-label="Aggiungi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      </form>
+      <div id="listItems"></div>
     </section>
   </main>
 
@@ -303,6 +335,17 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
   </div>
 </div>
 
+<!-- TESTO (voce di lista, nome lista) -->
+<div class="overlay choice" id="prompt">
+  <form class="sheet" id="promptForm" autocomplete="off">
+    <p id="promptTitle"></p>
+    <div class="group"><input name="val" class="title-input" maxlength="200" autocapitalize="sentences"></div>
+    <button type="submit" class="btn-wide primary">Salva</button>
+    <button type="button" class="btn-wide danger" id="promptDel" hidden>Elimina</button>
+    <button type="button" class="btn-wide" data-close>Annulla</button>
+  </form>
+</div>
+
 <!-- IMPOSTAZIONI -->
 <div class="overlay" id="setSheet">
   <form class="sheet" id="setForm" autocomplete="off">
@@ -348,6 +391,7 @@ const WD = ['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','
 const WD_SHORT = ['dom','lun','mar','mer','gio','ven','sab'];
 const REPEAT_LABEL = { daily: 'ogni giorno', weekly: 'ogni settimana', monthly: 'ogni mese', yearly: 'ogni anno' };
 const PALETTE = ['#2f6fde','#d6336c','#2b9a66','#e8590c','#7048e8','#0c8599','#c92a2a','#e67700','#5c940d','#495057'];
+const DEFAULT_LISTS = [{ id: 'spesa', name: 'Spesa' }, { id: 'dafare', name: 'Da fare' }];
 const DEFAULT_SETTINGS = { people: [
   { id: 'papa', name: 'Papà', color: '#2f6fde' },
   { id: 'mamma', name: 'Mamma', color: '#d6336c' },
@@ -393,13 +437,17 @@ const st = {
   me: ls.get('nome', ''),
   view: ls.get('vista', 'month'),
   filter: ls.get('filtro', ''),
+  lists: DEFAULT_LISTS, items: [], listId: ls.get('lista', ''), listBusy: 0,
   y: now.getFullYear(), m: now.getMonth(), sel: todayStr(),
   months: {}, rec: [], settings: DEFAULT_SETTINGS,
   loaded: new Set(),
 };
 const cached = ls.get('dati', null);
-if (cached && st.code) { st.months = cached.months || {}; st.rec = cached.rec || []; st.settings = cached.settings || DEFAULT_SETTINGS; }
-const persist = () => ls.set('dati', { months: st.months, rec: st.rec, settings: st.settings });
+if (cached && st.code) {
+  st.months = cached.months || {}; st.rec = cached.rec || []; st.settings = cached.settings || DEFAULT_SETTINGS;
+  st.lists = cached.lists || DEFAULT_LISTS; st.items = cached.items || [];
+}
+const persist = () => ls.set('dati', { months: st.months, rec: st.rec, settings: st.settings, lists: st.lists, items: st.items });
 
 // ---------- server ----------
 async function api(path, opts = {}) {
@@ -423,6 +471,7 @@ function neededMonths() {
 }
 let inflight = 0, lastOffline = 0;
 async function load(force = false) {
+  if (st.view === 'lists') return loadLists();
   const want = neededMonths().filter(k => force || !st.loaded.has(k));
   if (!want.length || !st.code) return;
   inflight++; document.body.classList.add('syncing');
@@ -582,6 +631,8 @@ function render() {
   $('#monthView').hidden = st.view !== 'month';
   $('#weekView').hidden = st.view !== 'week';
   $('#agendaView').hidden = st.view !== 'agenda';
+  $('#listsView').hidden = st.view !== 'lists';
+  if (st.view === 'lists') return renderLists();
   renderFilters();
   if (st.view === 'month') renderMonth(); else if (st.view === 'week') renderWeek(); else renderAgenda();
 }
@@ -781,6 +832,119 @@ $('#deleteBtn').onclick = () => {
   }
 };
 
+// ---------- liste condivise ----------
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+function curList() {
+  if (!st.lists.some(l => l.id === st.listId)) st.listId = st.lists[0] ? st.lists[0].id : '';
+  return st.listId;
+}
+async function loadLists() {
+  inflight++; document.body.classList.add('syncing');
+  try {
+    const d = await api('lists');
+    if (st.listBusy === 0) { st.lists = d.lists || DEFAULT_LISTS; st.items = d.items || []; persist(); }
+    if (!anySheetOpen() && st.view === 'lists') renderLists();
+  } catch (err) {
+    if (err.auth) return logout('Il codice non è più valido.');
+    if (Date.now() - lastOffline > 120000) { lastOffline = Date.now(); toast('Offline: vedi gli ultimi dati salvati'); }
+  } finally {
+    if (--inflight <= 0) { inflight = 0; document.body.classList.remove('syncing'); }
+  }
+}
+function renderLists() {
+  $('#monthTitle').innerHTML = 'Liste';
+  const id = curList(), list = st.lists.find(l => l.id === id);
+  $('#listTabs').innerHTML = st.lists.map(l => {
+    const n = st.items.filter(i => i.list === l.id && !i.done).length;
+    return `<button class="fchip${l.id === id ? ' on' : ''}" data-list="${esc(l.id)}">${esc(l.name)}${n ? ` <small>${n}</small>` : ''}</button>`;
+  }).join('') + `<button class="fchip" data-newlist>+ Nuova lista</button>`;
+  $('#addItemForm').hidden = !list;
+  if (list) $('#addItemForm').entry.placeholder = `Aggiungi a ${list.name}…`;
+  if (!list) { $('#listItems').innerHTML = '<div class="empty">Nessuna lista. Tocca "+ Nuova lista".</div>'; return; }
+  const mine = st.items.filter(i => i.list === id);
+  const open = mine.filter(i => !i.done).sort((a, b) => a.createdAt - b.createdAt);
+  const done = mine.filter(i => i.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  const row = i => `<div class="item${i.done ? ' done' : ''}" data-item="${esc(i._key)}">
+    <button class="check" data-toggle aria-label="${i.done ? 'Da rifare' : 'Fatto'}">${i.done ? '✓' : ''}</button>
+    <button class="txt" data-edit>${esc(i.text)}</button></div>`;
+  let html = open.length ? `<div class="items">${open.map(row).join('')}</div>`
+    : `<div class="empty">${done.length ? 'Tutto fatto! 🎉' : 'Lista vuota: scrivi qui sopra per aggiungere.'}</div>`;
+  if (done.length) html += `<div class="ls-sub"><span>Completati (${done.length})</span><button data-clear>Svuota</button></div><div class="items">${done.map(row).join('')}</div>`;
+  html += `<div class="ls-actions"><button data-rename>Rinomina lista</button><button class="danger" data-dellist>Elimina lista</button></div>`;
+  $('#listItems').innerHTML = html;
+}
+async function listOp(apply, call) {
+  st.listBusy++;
+  const snapshot = { lists: st.lists.map(l => ({ ...l })), items: st.items.map(i => ({ ...i })) };
+  apply(); persist(); renderLists();
+  try { await call(); }
+  catch (err) {
+    st.lists = snapshot.lists; st.items = snapshot.items; persist(); renderLists();
+    if (err.auth) { st.listBusy = 0; return logout('Il codice non è più valido.'); }
+    toast(netMsg(err));
+  } finally { st.listBusy--; }
+}
+function saveItem(item) {
+  return api('items', { method: 'POST', body: JSON.stringify(item) }).then(saved => {
+    const i = st.items.findIndex(x => x._key === saved._key);
+    if (i >= 0) st.items[i] = saved; else st.items.push(saved);
+    persist();
+  });
+}
+const saveLists = () => api('lists', { method: 'PUT', body: JSON.stringify({ lists: st.lists }) });
+let promptDone = null, promptDelete = null;
+function ask(title, value, onSave, onDelete) {
+  $('#promptTitle').textContent = title;
+  $('#promptForm').val.value = value || '';
+  promptDone = onSave; promptDelete = onDelete || null;
+  $('#promptDel').hidden = !onDelete;
+  openSheet($('#prompt'));
+  setTimeout(() => $('#promptForm').val.focus(), 250);
+}
+$('#promptForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('#promptForm').val.value.trim();
+  if (!v) return;
+  closeSheet($('#prompt'));
+  if (promptDone) promptDone(v);
+});
+$('#promptDel').onclick = () => { closeSheet($('#prompt')); if (promptDelete) promptDelete(); };
+
+$('#addItemForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const input = $('#addItemForm').entry, text = input.value.trim(), list = curList();
+  if (!text || !list) return;
+  input.value = '';
+  const id = newId();
+  const item = { id, list, text, done: false, by: st.me, createdAt: Date.now(), doneAt: 0, _key: `li/${list}/${id}` };
+  listOp(() => st.items.push(item), () => saveItem(item));
+});
+$('#listsView').addEventListener('click', e => {
+  const t = e.target;
+  const tab = t.closest('[data-list]');
+  if (tab) { st.listId = tab.dataset.list; ls.set('lista', st.listId); return renderLists(); }
+  if (t.closest('[data-newlist]')) return ask('Nuova lista', '', name => {
+    const l = { id: newId(), name };
+    listOp(() => { st.lists.push(l); st.listId = l.id; ls.set('lista', l.id); }, saveLists);
+  });
+  const list = st.lists.find(l => l.id === curList());
+  if (t.closest('[data-rename]') && list) return ask('Rinomina lista', list.name, name => listOp(() => { list.name = name; }, saveLists));
+  if (t.closest('[data-dellist]') && list) return choose(`Eliminare la lista "${list.name}" con tutte le sue voci?`, [{
+    label: 'Elimina lista', danger: true,
+    act: () => listOp(() => { st.lists = st.lists.filter(l => l.id !== list.id); st.items = st.items.filter(i => i.list !== list.id); },
+      () => api('lists?id=' + encodeURIComponent(list.id), { method: 'DELETE' })),
+  }]);
+  if (t.closest('[data-clear]') && list) return listOp(
+    () => { st.items = st.items.filter(i => !(i.list === list.id && i.done)); },
+    () => api('items/clear?list=' + encodeURIComponent(list.id), { method: 'POST', body: '{}' }));
+  const row = t.closest('[data-item]'); if (!row) return;
+  const item = st.items.find(i => i._key === row.dataset.item); if (!item) return;
+  if (t.closest('[data-toggle]')) return listOp(() => { item.done = !item.done; item.doneAt = item.done ? Date.now() : 0; }, () => saveItem({ ...item }));
+  if (t.closest('[data-edit]')) return ask('Modifica', item.text,
+    text => listOp(() => { item.text = text; }, () => saveItem({ ...item })),
+    () => listOp(() => { st.items = st.items.filter(i => i !== item); }, () => api('items?key=' + encodeURIComponent(item._key), { method: 'DELETE' })));
+});
+
 // ---------- impostazioni ----------
 const S = $('#setForm');
 let draft = [];
@@ -846,7 +1010,7 @@ function showLogin(msg) {
 }
 function logout(msg) {
   ls.del('codice'); ls.del('dati');
-  st.code = ''; st.months = {}; st.rec = []; st.loaded = new Set();
+  st.code = ''; st.months = {}; st.rec = []; st.loaded = new Set(); st.items = []; st.lists = DEFAULT_LISTS;
   $$('.overlay.open').forEach(o => o.classList.remove('open')); document.body.classList.remove('locked');
   showLogin(msg);
 }

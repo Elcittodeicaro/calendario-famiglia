@@ -18,6 +18,13 @@ const DEFAULT_SETTINGS = {
   ],
 };
 
+const DEFAULT_LISTS = [
+  { id: "spesa", name: "Spesa" },
+  { id: "dafare", name: "Da fare" },
+];
+const LIST_ID_RE = /^[a-z0-9-]{1,40}$/;
+const ITEM_KEY_RE = /^li\/[a-z0-9-]{1,40}\/[a-z0-9-]{6,40}$/;
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -131,6 +138,71 @@ export default async (req: Request, context: Context) => {
       if (!KEY_RE.test(key)) return json({ error: "Chiave non valida" }, 400);
       await s.delete(key);
       return json({ ok: true });
+    }
+
+    // ---------- liste condivise: una chiave per voce (li/<lista>/<voce>) ----------
+    if (route === "lists" && req.method === "GET") {
+      const [lists, items] = await Promise.all([s.get("lists", { type: "json" }), readPrefix("li/")]);
+      return json({ lists: lists || DEFAULT_LISTS, items });
+    }
+
+    if (route === "lists" && req.method === "PUT") {
+      const body = await req.json();
+      const lists = (Array.isArray(body.lists) ? body.lists : []).slice(0, 30).map((l: any) => ({
+        id: typeof l.id === "string" && LIST_ID_RE.test(l.id) ? l.id : randomUUID().slice(0, 8),
+        name: str(l.name, 40) || "Lista",
+      }));
+      await s.setJSON("lists", lists);
+      return json({ lists });
+    }
+
+    if (route === "lists" && req.method === "DELETE") {
+      const id = url.searchParams.get("id") || "";
+      if (!LIST_ID_RE.test(id)) return json({ error: "Lista non valida" }, 400);
+      const current = ((await s.get("lists", { type: "json" })) as any[]) || DEFAULT_LISTS;
+      const lists = current.filter((l) => l.id !== id);
+      await s.setJSON("lists", lists);
+      const { blobs } = await s.list({ prefix: `li/${id}/` });
+      await Promise.all(blobs.map((b) => s.delete(b.key)));
+      return json({ lists });
+    }
+
+    if (route === "items" && req.method === "POST") {
+      const body = await req.json();
+      const list = typeof body.list === "string" && LIST_ID_RE.test(body.list) ? body.list : "";
+      const text = str(body.text, 200);
+      if (!list) return json({ error: "Lista non valida" }, 400);
+      if (!text) return json({ error: "Scrivi qualcosa" }, 400);
+      const done = !!body.done;
+      const item = {
+        id: typeof body.id === "string" && ID_RE.test(body.id) ? body.id : randomUUID(),
+        list,
+        text,
+        done,
+        by: str(body.by, 40),
+        createdAt: typeof body.createdAt === "number" ? body.createdAt : Date.now(),
+        doneAt: done ? (typeof body.doneAt === "number" && body.doneAt ? body.doneAt : Date.now()) : 0,
+        updatedAt: Date.now(),
+      };
+      const key = `li/${list}/${item.id}`;
+      await s.setJSON(key, item);
+      return json({ ...item, _key: key });
+    }
+
+    if (route === "items" && req.method === "DELETE") {
+      const key = url.searchParams.get("key") || "";
+      if (!ITEM_KEY_RE.test(key)) return json({ error: "Voce non valida" }, 400);
+      await s.delete(key);
+      return json({ ok: true });
+    }
+
+    if (route === "items/clear" && req.method === "POST") {
+      const list = url.searchParams.get("list") || "";
+      if (!LIST_ID_RE.test(list)) return json({ error: "Lista non valida" }, 400);
+      const items = (await readPrefix(`li/${list}/`)) as any[];
+      const done = items.filter((i) => i.done);
+      await Promise.all(done.map((i) => s.delete(i._key)));
+      return json({ deleted: done.length });
     }
 
     if (route === "settings" && req.method === "PUT") {
