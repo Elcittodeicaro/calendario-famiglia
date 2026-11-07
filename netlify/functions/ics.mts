@@ -71,11 +71,12 @@ function vevent(ev: any, names: Map<string, string>): string[] {
   const allDay = ev.allDay || !ev.start;
 
   const L: string[] = ["BEGIN:VEVENT", `UID:${ev.id}@calendario-famiglia`, `DTSTAMP:${utc(ev.updatedAt)}`, `SUMMARY:${text(summary)}`];
+  const last = ev.endDate && ev.endDate > ev.date ? ev.endDate : ev.date; // impegni su più giorni
   if (allDay) {
-    L.push(`DTSTART;VALUE=DATE:${d8(ev.date)}`, `DTEND;VALUE=DATE:${d8(nextDay(ev.date))}`);
+    L.push(`DTSTART;VALUE=DATE:${d8(ev.date)}`, `DTEND;VALUE=DATE:${d8(nextDay(last))}`);
   } else {
-    const end = ev.end && ev.end > ev.start ? ev.end : plusHour(ev.start);
-    L.push(`DTSTART:${localDT(ev.date, ev.start)}`, `DTEND:${localDT(ev.date, end)}`);
+    const end = ev.end && (last > ev.date || ev.end > ev.start) ? ev.end : plusHour(ev.start);
+    L.push(`DTSTART:${localDT(ev.date, ev.start)}`, `DTEND:${localDT(last, end)}`);
   }
   if (desc) L.push(`DESCRIPTION:${text(desc)}`);
 
@@ -100,6 +101,23 @@ function vevent(ev: any, names: Map<string, string>): string[] {
   return L;
 }
 
+// Voce di lista con scadenza -> impegno "☐ ..." con promemoria (alle 9, o un'ora prima dell'orario)
+function vtask(it: any, listName: string, names: Map<string, string>): string[] {
+  const care = (it.care || []).map((id: string) => names.get(id)).filter(Boolean);
+  const desc = [`Lista: ${listName}`, care.length ? `Ci pensa: ${joinNames(care)}` : "", it.by ? `Aggiunto da ${it.by}` : ""].filter(Boolean).join("\n");
+  const L = ["BEGIN:VEVENT", `UID:${it.id}@lista-famiglia`, `DTSTAMP:${utc(it.updatedAt)}`, `SUMMARY:${text("☐ " + it.text)}`, `DESCRIPTION:${text(desc)}`];
+  if (it.dueTime) {
+    const [h, m] = it.dueTime.split(":").map(Number);
+    const endMin = Math.min(h * 60 + m + 30, 23 * 60 + 59);
+    const end = `${String(Math.floor(endMin / 60)).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
+    L.push(`DTSTART:${localDT(it.due, it.dueTime)}`, `DTEND:${localDT(it.due, end)}`);
+  } else {
+    L.push(`DTSTART;VALUE=DATE:${d8(it.due)}`, `DTEND;VALUE=DATE:${d8(nextDay(it.due))}`);
+  }
+  L.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${text(it.text)}`, `TRIGGER:${it.dueTime ? "-PT60M" : "PT9H"}`, "END:VALARM", "END:VEVENT");
+  return L;
+}
+
 async function readPrefix(prefix: string) {
   const s = store();
   const { blobs } = await s.list({ prefix });
@@ -118,11 +136,18 @@ export default async (req: Request) => {
     const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + i, 1));
     months.push(d.toISOString().slice(0, 7));
   }
-  const [lists, rec, settings] = await Promise.all([
+  const oldest = `${months[0]}-01`;
+  const spanKeys = (await store().list({ prefix: "span/" })).blobs.map((b) => b.key).filter((k) => k.slice(16, 26) >= oldest);
+  const [lists, rec, settings, spans, items, listMeta] = await Promise.all([
     Promise.all(months.map((m) => readPrefix(`ev/${m}/`))),
     readPrefix("rec/"),
     store().get("settings", { type: "json" }) as Promise<any>,
+    Promise.all(spanKeys.map((k) => store().get(k, { type: "json" }))),
+    readPrefix("li/"),
+    store().get("lists", { type: "json" }) as Promise<any[] | null>,
   ]);
+  const listName = new Map((listMeta || [{ id: "spesa", name: "Spesa" }, { id: "dafare", name: "Da fare" }]).map((l: any) => [l.id, l.name]));
+  const tasks = items.filter((it: any) => !it.done && it.due && it.due >= oldest);
   const people: { id: string; name: string }[] = settings?.people || DEFAULT_PEOPLE;
   const names = new Map(people.map((p) => [p.id, p.name]));
 
@@ -136,7 +161,8 @@ export default async (req: Request) => {
     "X-APPLE-CALENDAR-COLOR:#E8590C",
     "REFRESH-INTERVAL;VALUE=DURATION:PT15M",
     "X-PUBLISHED-TTL:PT15M",
-    ...[...lists.flat(), ...rec].flatMap((ev) => vevent(ev, names)),
+    ...[...lists.flat(), ...rec, ...spans.filter(Boolean)].flatMap((ev) => vevent(ev, names)),
+    ...tasks.flatMap((it: any) => vtask(it, listName.get(it.list) || "Lista", names)),
     "END:VCALENDAR",
   ];
   return new Response(lines.map(fold).join("\r\n") + "\r\n", {

@@ -88,6 +88,18 @@ body[data-view=week] .title-row h1{font-size:21px;margin:0 2px}
 .dots{display:flex;gap:3px;height:6px;align-items:center}
 .dots i{width:6px;height:6px;border-radius:50%;display:block}
 .dots b{font-size:10px;line-height:6px;color:var(--muted)}
+.dots i.t{background:transparent!important;box-shadow:inset 0 0 0 1.5px var(--muted)}
+.task{display:flex;gap:12px;align-items:flex-start;background:var(--card);border-radius:14px;padding:12px 14px;margin:8px 0;border:1.5px dashed var(--line)}
+.task .check{margin-top:1px}
+.task-body{flex:1;min-width:0;cursor:pointer}
+.task.late .rep{color:var(--accent);font-weight:600}
+.wk-list .task{margin:0 0 6px;padding:9px 12px}
+.wk-list .task:last-child{margin-bottom:0}
+.isub{display:block;font-size:13px;color:var(--muted);margin-top:2px;text-decoration:none}
+.isub .late{color:var(--accent);font-weight:600}
+.item.done .isub{display:none}
+.ls-more{width:38px;height:38px;border-radius:50%;background:var(--soft)!important;color:var(--ink)!important;display:grid;place-items:center;flex:none}
+.xbtn{width:30px;height:30px;border-radius:50%;color:var(--muted);font-size:16px;margin-left:4px;vertical-align:middle}
 .cell.other .dots{opacity:.4}
 .day{padding:6px 14px 130px;border-top:1px solid var(--line)}
 .day h2,.ag-day{font-size:17px;font-weight:700;margin:14px 2px 6px}
@@ -282,6 +294,7 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
       <div class="ls-tabs" id="listTabs"></div>
       <form class="ls-add" id="addItemForm" autocomplete="off">
         <input name="entry" placeholder="Aggiungi…" enterkeyhint="send" autocapitalize="sentences" maxlength="200">
+        <button type="button" class="ls-more" id="addDetailed" aria-label="Aggiungi con scadenza"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button>
         <button type="submit" aria-label="Aggiungi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
       </form>
       <div id="listItems"></div>
@@ -319,8 +332,10 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
     <div class="label">Quando</div>
     <div class="group">
       <div class="row"><span id="dateLabel">Giorno</span><input type="date" name="date" required></div>
+      <div class="row" id="multiRow"><span>Più giorni</span><input type="checkbox" class="switch" name="multi"></div>
+      <div class="row" id="endRow"><span>Fino al</span><input type="date" name="endDate"></div>
       <div class="row"><span>Tutto il giorno</span><input type="checkbox" class="switch" name="allDay"></div>
-      <div class="row" id="timeRow"><span>Orario</span><span><input type="time" name="start" step="300"> – <input type="time" name="end" step="300"></span></div>
+      <div class="row" id="timeRow"><span id="timeLabel">Orario</span><span><input type="time" name="start" step="300"> – <input type="time" name="end" step="300"></span></div>
       <div class="row"><span>Si ripete</span>
         <select name="repeat">
           <option value="none">Mai</option>
@@ -340,6 +355,29 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
 
     <div class="meta" id="evMeta"></div>
     <button type="button" class="btn-wide danger" id="deleteBtn">Elimina impegno</button>
+  </form>
+</div>
+
+<!-- VOCE DI LISTA -->
+<div class="overlay" id="itemSheet">
+  <form class="sheet" id="itemForm" autocomplete="off" novalidate>
+    <div class="sheet-head">
+      <button type="button" class="l" data-close>Annulla</button>
+      <h3 id="itemTitle">Da fare</h3>
+      <button type="submit" class="r">Salva</button>
+    </div>
+    <div class="group"><input class="title-input" name="txt" placeholder="Cosa c'è da fare?" maxlength="200" autocapitalize="sentences"></div>
+    <div class="group"><div class="row"><span>Lista</span><select name="list"></select></div></div>
+    <div class="label">Entro quando</div>
+    <div class="group">
+      <div class="row"><span>Giorno</span><span><input type="date" name="due"><button type="button" class="xbtn" id="dueClear" aria-label="Togli la data">✕</button></span></div>
+      <div class="row" id="dueTimeRow"><span>Ora (facoltativa)</span><input type="time" name="dueTime" step="300"></div>
+    </div>
+    <div class="hint">Con una data compare nel calendario e arriva un promemoria: alle 9 di quel giorno, oppure un'ora prima dell'ora indicata.</div>
+    <div class="label">Chi se ne occupa</div>
+    <div class="group"><div class="who" id="itemCare"></div></div>
+    <div class="meta" id="itemMeta"></div>
+    <button type="button" class="btn-wide danger" id="itemDel">Elimina</button>
   </form>
 </div>
 
@@ -463,7 +501,7 @@ const st = {
   me: ls.get('nome', ''),
   view: ls.get('vista', 'month'),
   filter: ls.get('filtro', ''),
-  lists: DEFAULT_LISTS, items: [], listId: ls.get('lista', ''), listBusy: 0,
+  lists: DEFAULT_LISTS, items: [], listId: ls.get('lista', ''), listBusy: 0, spans: {},
   y: now.getFullYear(), m: now.getMonth(), sel: todayStr(),
   months: {}, rec: [], settings: DEFAULT_SETTINGS,
   loaded: new Set(),
@@ -471,9 +509,9 @@ const st = {
 const cached = ls.get('dati', null);
 if (cached && st.code) {
   st.months = cached.months || {}; st.rec = cached.rec || []; st.settings = cached.settings || DEFAULT_SETTINGS;
-  st.lists = cached.lists || DEFAULT_LISTS; st.items = cached.items || [];
+  st.lists = cached.lists || DEFAULT_LISTS; st.items = cached.items || []; st.spans = cached.spans || {};
 }
-const persist = () => ls.set('dati', { months: st.months, rec: st.rec, settings: st.settings, lists: st.lists, items: st.items });
+const persist = () => ls.set('dati', { months: st.months, rec: st.rec, spans: st.spans, settings: st.settings, lists: st.lists, items: st.items });
 
 // ---------- server ----------
 const deviceId = (() => {
@@ -511,6 +549,9 @@ async function load(force = false) {
     if (force) st.loaded = new Set();
     for (const k of want) { st.months[k] = data.months[k] || []; st.loaded.add(k); }
     st.rec = data.rec || [];
+    if (force) st.spans = {};
+    for (const e of data.spans || []) st.spans[e._key] = e;
+    if (st.listBusy === 0) { if (data.lists) st.lists = data.lists; if (data.items) st.items = data.items; }
     st.settings = data.settings && data.settings.people ? data.settings : DEFAULT_SETTINGS;
     persist();
     if (!anySheetOpen()) render();
@@ -563,6 +604,10 @@ function occurrences(from, to) {
     for (const ev of list) if (ev.date >= from && ev.date <= to) (out[ev.date] = out[ev.date] || []).push({ ...ev, occ: ev.date });
   }
   for (const ev of st.rec) expand(ev, from, to, out);
+  for (const ev of Object.values(st.spans)) { // impegni su più giorni
+    if (ev.endDate < from || ev.date > to) continue;
+    for (let d = ev.date < from ? from : ev.date; d <= ev.endDate && d <= to; d = addDays(d, 1)) (out[d] = out[d] || []).push({ ...ev, occ: d });
+  }
   const f = st.filter && person(st.filter) ? st.filter : '';
   for (const d in out) {
     if (f) { out[d] = out[d].filter(e => (e.who || []).includes(f) || (e.care || []).includes(f)); if (!out[d].length) { delete out[d]; continue; } }
@@ -572,25 +617,64 @@ function occurrences(from, to) {
 }
 function findEvent(key) {
   if (key.startsWith('rec/')) return st.rec.find(e => e._key === key);
+  if (key.startsWith('span/')) return st.spans[key];
   for (const list of Object.values(st.months)) { const e = list.find(x => x._key === key); if (e) return e; }
 }
 function removeLocal(key) {
   if (!key) return;
   st.rec = st.rec.filter(e => e._key !== key);
+  delete st.spans[key];
   for (const k in st.months) st.months[k] = st.months[k].filter(e => e._key !== key);
 }
 function upsertLocal(ev, oldKey) {
   removeLocal(oldKey); removeLocal(ev._key);
   if (ev.repeat !== 'none') st.rec.push(ev);
+  else if (ev.endDate && ev.endDate > ev.date) st.spans[ev._key] = ev;
   else { const k = ev.date.slice(0, 7); (st.months[k] = st.months[k] || []).push(ev); }
   persist();
 }
 
 // ---------- disegno ----------
+function rangeLabel(a, b) {
+  const x = pd(a), y = pd(b);
+  return x.getMonth() === y.getMonth() ? `${x.getDate()}–${y.getDate()} ${MONTHS[y.getMonth()].slice(0, 3)}`
+    : `${x.getDate()} ${MONTHS[x.getMonth()].slice(0, 3)} – ${y.getDate()} ${MONTHS[y.getMonth()].slice(0, 3)}`;
+}
+const dueShort = d => { const t = todayStr(); if (d === t) return 'oggi'; if (d === addDays(t, 1)) return 'domani'; if (d === addDays(t, -1)) return 'ieri'; const x = pd(d); return `${WD_SHORT[x.getDay()]} ${x.getDate()} ${MONTHS[x.getMonth()].slice(0, 3)}`; };
+// Voci delle liste con scadenza, per giorno (quelle in ritardo finiscono su oggi)
+function tasksBetween(from, to) {
+  const out = {}, today = todayStr(), f = st.filter && person(st.filter) ? st.filter : '';
+  for (const it of st.items) {
+    if (it.done || !it.due) continue;
+    if (f && !(it.care || []).includes(f)) continue;
+    let d = it.due;
+    if (d < today) { if (today < from || today > to) continue; d = today; }
+    else if (d < from || d > to) continue;
+    (out[d] = out[d] || []).push(it);
+  }
+  for (const d in out) out[d].sort((a, b) => (a.dueTime || '99').localeCompare(b.dueTime || '99'));
+  return out;
+}
+function taskHtml(t) {
+  const list = st.lists.find(l => l.id === t.list), late = t.due < todayStr();
+  const chips = (t.care || []).map(person).filter(Boolean).map(p => `<span class="chip" style="--c:${p.color}">${esc(p.name)}</span>`).join('');
+  const what = late ? `In ritardo · era per ${esc(dueShort(t.due))}` : `Da fare${t.dueTime ? ' entro le ' + esc(t.dueTime) : ''}`;
+  return `<div class="task${late ? ' late' : ''}" data-task="${esc(t._key)}">
+    <button class="check" data-tcheck aria-label="Fatto"></button>
+    <div class="task-body" role="button" tabindex="0"><div class="ev-title">${esc(t.text)}</div>
+    <div class="ev-meta"><span class="rep">${what} · ${esc(list ? list.name : 'Lista')}</span>${chips}</div></div></div>`;
+}
+const dayHtml = (evs, tks) => (evs || []).map(evHtml).join('') + (tks || []).map(taskHtml).join('');
 function evHtml(e) {
-  const time = e.allDay ? '<span class="allday">Tutto il giorno</span>' : `<b>${esc(e.start)}</b>${e.end ? `<small>${esc(e.end)}</small>` : ''}`;
+  const multi = e.endDate && e.endDate > e.date, first = !multi || e.occ === e.date, last = !multi || e.occ === e.endDate;
+  let time;
+  if (e.allDay || (multi && !first && !last)) time = '<span class="allday">Tutto il giorno</span>';
+  else if (multi && first) time = `<b>${esc(e.start)}</b><small>inizio</small>`;
+  else if (multi && last) time = e.end ? `<small>fino alle</small><b>${esc(e.end)}</b>` : '<span class="allday">Tutto il giorno</span>';
+  else time = `<b>${esc(e.start)}</b>${e.end ? `<small>${esc(e.end)}</small>` : ''}`;
   const chips = (e.who || []).map(person).filter(Boolean).map(p => `<span class="chip" style="--c:${p.color}">${esc(p.name)}</span>`).join('');
-  const rep = e.repeat !== 'none' ? `<span class="rep">↻ ${REPEAT_LABEL[e.repeat] || ''}</span>` : '';
+  const rep = e.repeat !== 'none' ? `<span class="rep">↻ ${REPEAT_LABEL[e.repeat] || ''}</span>`
+    : multi ? `<span class="rep">↔ ${esc(rangeLabel(e.date, e.endDate))}</span>` : '';
   return `<div class="ev" role="button" tabindex="0" style="--c:${evColor(e)}" data-key="${esc(e._key)}" data-occ="${esc(e.occ)}">
     <div class="ev-time">${time}</div>
     <div class="ev-body"><div class="ev-title">${esc(e.title)}</div>
@@ -615,27 +699,30 @@ function renderMonth() {
   const gridStart = ds(new Date(st.y, st.m, 1 - offset));
   const days = new Date(st.y, st.m + 1, 0).getDate();
   const cells = Math.ceil((offset + days) / 7) * 7;
-  const occ = occurrences(gridStart, addDays(gridStart, cells - 1));
+  const occ = occurrences(gridStart, addDays(gridStart, cells - 1)), tk = tasksBetween(gridStart, addDays(gridStart, cells - 1));
   const today = todayStr();
   let html = '';
   for (let i = 0; i < cells; i++) {
     const d = addDays(gridStart, i), dd = pd(d), list = occ[d] || [];
-    const dots = list.slice(0, 4).map(e => `<i style="background:${evColor(e)}"></i>`).join('') + (list.length > 4 ? '<b>+</b>' : '');
+    const tl = tk[d] || [], marks = [...list.map(e => `<i style="background:${evColor(e)}"></i>`), ...tl.map(() => '<i class="t"></i>')];
+    const dots = marks.slice(0, 4).join('') + (marks.length > 4 ? '<b>+</b>' : '');
     html += `<button class="cell${dd.getMonth() !== st.m ? ' other' : ''}${d === today ? ' today' : ''}${d === st.sel ? ' sel' : ''}" data-d="${d}"><span class="n">${dd.getDate()}</span><span class="dots">${dots}</span></button>`;
   }
   $('#grid').innerHTML = html;
   const list = occ[st.sel] || (occurrences(st.sel, st.sel)[st.sel] || []);
+  const tsel = tk[st.sel] || (tasksBetween(st.sel, st.sel)[st.sel] || []);
   $('#dayTitle').textContent = dayLabel(st.sel);
-  $('#dayEvents').innerHTML = list.length ? list.map(evHtml).join('')
+  $('#dayEvents').innerHTML = list.length || tsel.length ? dayHtml(list, tsel)
     : `<div class="empty">Niente in programma.<br><button class="link" data-add>+ Aggiungi un impegno</button></div>`;
 }
 function renderAgenda() {
   $('#monthTitle').innerHTML = 'Agenda';
   const from = todayStr(), to = addDays(from, 59);
   const occ = occurrences(from, to);
-  const days = Object.keys(occ).sort();
+  const tk = tasksBetween(from, to);
+  const days = [...new Set([...Object.keys(occ), ...Object.keys(tk)])].sort();
   $('#agendaList').innerHTML = days.length
-    ? days.map(d => `<h3 class="ag-day${d === from ? ' is-today' : ''}">${esc(dayLabel(d))}</h3>${occ[d].map(evHtml).join('')}`).join('')
+    ? days.map(d => `<h3 class="ag-day${d === from ? ' is-today' : ''}">${esc(dayLabel(d))}</h3>${dayHtml(occ[d], tk[d])}`).join('')
     : '<div class="empty">Niente in programma nei prossimi due mesi.</div>';
 }
 function weekStart(s) { return addDays(s, -((pd(s).getDay() + 6) % 7)); }
@@ -643,15 +730,15 @@ function renderWeek() {
   const a = weekStart(st.sel), b = addDays(a, 6), da = pd(a), db = pd(b);
   const yr = db.getFullYear() !== new Date().getFullYear() ? ` <span>${db.getFullYear()}</span>` : '';
   $('#monthTitle').innerHTML = (da.getMonth() === db.getMonth()
-    ? `${da.getDate()}–${db.getDate()} ${MONTHS[db.getMonth()]}`
+    ? `${da.getDate()}–${db.getDate()} ${MONTHS[db.getMonth()].slice(0, 3)}`
     : `${da.getDate()} ${MONTHS[da.getMonth()].slice(0, 3)} – ${db.getDate()} ${MONTHS[db.getMonth()].slice(0, 3)}`) + yr;
-  const occ = occurrences(a, b), today = todayStr();
+  const occ = occurrences(a, b), tk = tasksBetween(a, b), today = todayStr();
   let html = '';
   for (let i = 0; i < 7; i++) {
     const d = addDays(a, i), dd = pd(d), list = occ[d] || [];
     html += `<div class="wk-day${d === today ? ' today' : ''}${d === st.sel ? ' sel' : ''}${d < today ? ' past' : ''}">
       <button class="wk-date" data-sel="${d}"><span class="wk-wd">${WD_SHORT[dd.getDay()]}</span><span class="wk-n">${dd.getDate()}</span></button>
-      <div class="wk-list">${list.length ? list.map(evHtml).join('') : `<button class="wk-free" data-add="${d}"><span>Libero</span><b>+</b></button>`}</div>
+      <div class="wk-list">${list.length || tk[d] ? dayHtml(list, tk[d]) : `<button class="wk-free" data-add="${d}"><span>Libero</span><b>+</b></button>`}</div>
     </div>`;
   }
   $('#weekView').innerHTML = html;
@@ -714,6 +801,13 @@ let tx = null, ty = null;
   }, { passive: true });
 });
 document.addEventListener('click', e => {
+  const tsk = e.target.closest('[data-task]');
+  if (tsk) {
+    const it = st.items.find(i => i._key === tsk.dataset.task); if (!it) return;
+    if (e.target.closest('[data-tcheck]')) { listOp(() => { it.done = true; it.doneAt = Date.now(); }, () => saveItem({ ...it })); toast('Fatto ✓'); }
+    else openItem(it);
+    return;
+  }
   const ev = e.target.closest('.ev');
   if (ev) {
     const found = findEvent(ev.dataset.key) || (st.searchRes || []).find(x => x._key === ev.dataset.key);
@@ -764,14 +858,27 @@ function fillAlerts(value) {
   F.alert.value = list.some(([v]) => v === value) ? value : (F.allDay.checked ? 'morning' : '60');
 }
 function syncFormRows() {
+  const repeats = F.repeat.value !== 'none';
+  if (repeats) F.multi.checked = false;
+  $('#multiRow').hidden = repeats;
+  $('#endRow').hidden = !F.multi.checked;
   $('#timeRow').hidden = F.allDay.checked;
-  $('#untilRow').hidden = F.repeat.value === 'none';
-  $('#dateLabel').textContent = F.repeat.value === 'none' ? 'Giorno' : 'A partire dal';
+  $('#untilRow').hidden = !repeats;
+  $('#dateLabel').textContent = repeats ? 'A partire dal' : F.multi.checked ? 'Dal' : 'Giorno';
+  $('#timeLabel').textContent = F.multi.checked ? 'Inizio – fine' : 'Orario';
 }
+F.multi.onchange = () => {
+  if (F.multi.checked) {
+    if (!F.endDate.value || F.endDate.value <= F.date.value) F.endDate.value = addDays(F.date.value || st.sel, 1);
+    if (!F.allDay.checked) { F.allDay.checked = true; fillAlerts(F.alert.value); }
+  }
+  syncFormRows();
+};
+F.date.onchange = () => { if (F.multi.checked && F.date.value && F.endDate.value <= F.date.value) F.endDate.value = addDays(F.date.value, 1); };
 F.allDay.onchange = () => { fillAlerts(F.alert.value); syncFormRows(); };
 F.repeat.onchange = syncFormRows;
 F.start.onchange = () => {
-  if (!F.start.value) return;
+  if (!F.start.value || F.multi.checked) return;
   if (!F.end.value || F.end.value <= F.start.value) {
     const [h, m] = F.start.value.split(':').map(Number);
     F.end.value = h < 23 ? `${pad(h + 1)}:${pad(m)}` : '23:59';
@@ -783,6 +890,8 @@ function openEditor(ev, occ, date) {
   F.what.value = ev ? ev.title : '';
   F.date.value = ev ? ev.date : (date || (st.view === 'agenda' ? todayStr() : st.sel));
   F.allDay.checked = ev ? !!ev.allDay : false;
+  F.multi.checked = !!(ev && ev.endDate);
+  F.endDate.value = ev && ev.endDate ? ev.endDate : '';
   F.start.value = ev && ev.start ? ev.start : '09:00';
   F.end.value = ev && ev.end ? ev.end : (ev ? '' : '10:00');
   F.repeat.value = ev ? ev.repeat : 'none';
@@ -819,11 +928,13 @@ F.addEventListener('submit', async e => {
     title: F.what.value.trim(), date: F.date.value, allDay: F.allDay.checked,
     start: F.start.value, end: F.end.value, who: [...whoSel], care: [...careSel], alert: F.alert.value,
     repeat: F.repeat.value, until: F.until.value, note: F.note.value,
+    endDate: F.repeat.value === 'none' && F.multi.checked ? F.endDate.value : '',
   };
   if (!body.title) { toast('Scrivi cosa c\'è da fare'); F.what.focus(); return; }
   if (!body.date) { toast('Scegli il giorno'); return; }
   if (!body.allDay && !body.start) body.allDay = true;
-  if (!body.allDay && body.end && body.end < body.start) { toast('L\'orario di fine è prima dell\'inizio'); return; }
+  if (body.endDate && body.endDate <= body.date) { toast('"Fino al" deve essere dopo il primo giorno'); return; }
+  if (!body.endDate && !body.allDay && body.end && body.end < body.start) { toast('L\'orario di fine è prima dell\'inizio'); return; }
   if (body.repeat !== 'none' && body.until && body.until < body.date) { toast('"Fino al" è prima dell\'inizio'); return; }
   $('#saveBtn').disabled = true;
   try {
@@ -887,6 +998,16 @@ async function loadLists() {
     if (--inflight <= 0) { inflight = 0; document.body.classList.remove('syncing'); }
   }
 }
+function itemSub(i) {
+  const bits = [];
+  if (i.due) {
+    const late = !i.done && i.due < todayStr();
+    bits.push(`<span class="${late ? 'late' : ''}">${late ? 'in ritardo, era per' : 'entro'} ${esc(dueShort(i.due))}${i.dueTime ? ' alle ' + esc(i.dueTime) : ''}</span>`);
+  }
+  const care = (i.care || []).map(person).filter(Boolean).map(p => esc(p.name));
+  if (care.length) bits.push((care.length > 1 ? 'ci pensano ' : 'ci pensa ') + care.join(' e '));
+  return bits.length ? `<span class="isub">${bits.join(' · ')}</span>` : '';
+}
 function renderLists() {
   $('#monthTitle').innerHTML = 'Liste';
   const id = curList(), list = st.lists.find(l => l.id === id);
@@ -902,20 +1023,20 @@ function renderLists() {
   const done = mine.filter(i => i.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const row = i => `<div class="item${i.done ? ' done' : ''}" data-item="${esc(i._key)}">
     <button class="check" data-toggle aria-label="${i.done ? 'Da rifare' : 'Fatto'}">${i.done ? '✓' : ''}</button>
-    <button class="txt" data-edit>${esc(i.text)}</button></div>`;
+    <button class="txt" data-edit>${esc(i.text)}${itemSub(i)}</button></div>`;
   let html = open.length ? `<div class="items">${open.map(row).join('')}</div>`
     : `<div class="empty">${done.length ? 'Tutto fatto! 🎉' : 'Lista vuota: scrivi qui sopra per aggiungere.'}</div>`;
   if (done.length) html += `<div class="ls-sub"><span>Completati (${done.length})</span><button data-clear>Svuota</button></div><div class="items">${done.map(row).join('')}</div>`;
   html += `<div class="ls-actions"><button data-rename>Rinomina lista</button><button class="danger" data-dellist>Elimina lista</button></div>`;
   $('#listItems').innerHTML = html;
 }
-async function listOp(apply, call) {
+async function listOp(apply, call) { // modifica subito sullo schermo, poi salva (e torna indietro se fallisce)
   st.listBusy++;
   const snapshot = { lists: st.lists.map(l => ({ ...l })), items: st.items.map(i => ({ ...i })) };
-  apply(); persist(); renderLists();
+  apply(); persist(); if (!anySheetOpen()) render();
   try { await call(); }
   catch (err) {
-    st.lists = snapshot.lists; st.items = snapshot.items; persist(); renderLists();
+    st.lists = snapshot.lists; st.items = snapshot.items; persist(); if (!anySheetOpen()) render();
     if (err.auth) { st.listBusy = 0; return logout('Il codice non è più valido.'); }
     toast(netMsg(err));
   } finally { st.listBusy--; }
@@ -976,10 +1097,67 @@ $('#listsView').addEventListener('click', e => {
   const row = t.closest('[data-item]'); if (!row) return;
   const item = st.items.find(i => i._key === row.dataset.item); if (!item) return;
   if (t.closest('[data-toggle]')) return listOp(() => { item.done = !item.done; item.doneAt = item.done ? Date.now() : 0; }, () => saveItem({ ...item }));
-  if (t.closest('[data-edit]')) return ask('Modifica', item.text,
-    text => listOp(() => { item.text = text; }, () => saveItem({ ...item })),
-    () => listOp(() => { st.items = st.items.filter(i => i !== item); }, () => api('items?key=' + encodeURIComponent(item._key), { method: 'DELETE' })));
+  if (t.closest('[data-edit]')) return openItem(item);
 });
+
+// ---------- editor della voce (scadenza, chi se ne occupa) ----------
+const IF = $('#itemForm');
+let itemEditing = null, itemCare = new Set();
+function openItem(item, preset = {}) {
+  itemEditing = item || null;
+  $('#itemTitle').textContent = item ? 'Modifica' : 'Nuova cosa da fare';
+  IF.txt.value = item ? item.text : (preset.text || '');
+  IF.list.innerHTML = st.lists.map(l => `<option value="${esc(l.id)}">${esc(l.name)}</option>`).join('');
+  IF.list.value = item ? item.list : (preset.list || curList());
+  IF.due.value = item ? (item.due || '') : (preset.due || '');
+  IF.dueTime.value = item ? (item.dueTime || '') : '';
+  itemCare = new Set(item ? (item.care || []) : (st.filter ? [st.filter] : []));
+  $('#itemCare').innerHTML = pickHtml(itemCare);
+  $('#dueTimeRow').hidden = !IF.due.value;
+  $('#itemDel').hidden = !item;
+  $('#itemMeta').textContent = item && item.by ? `Aggiunta da ${item.by}` : '';
+  openSheet($('#itemSheet'));
+  IF.scrollTop = 0;
+  if (!item && !IF.txt.value) setTimeout(() => IF.txt.focus(), 250);
+}
+IF.due.onchange = () => { $('#dueTimeRow').hidden = !IF.due.value; if (!IF.due.value) IF.dueTime.value = ''; };
+$('#dueClear').onclick = () => { IF.due.value = ''; IF.dueTime.value = ''; $('#dueTimeRow').hidden = true; };
+$('#itemCare').addEventListener('click', e => {
+  const b = e.target.closest('.pick'); if (!b) return;
+  itemCare.has(b.dataset.id) ? itemCare.delete(b.dataset.id) : itemCare.add(b.dataset.id);
+  $('#itemCare').innerHTML = pickHtml(itemCare);
+});
+IF.addEventListener('submit', e => {
+  e.preventDefault();
+  const text = IF.txt.value.trim(), list = IF.list.value;
+  if (!text) { toast('Scrivi cosa c\'è da fare'); IF.txt.focus(); return; }
+  if (!list) { toast('Crea prima una lista'); return; }
+  const data = { text, list, due: IF.due.value, dueTime: IF.due.value ? IF.dueTime.value : '', care: [...itemCare] };
+  const old = itemEditing;
+  closeSheet($('#itemSheet'));
+  if (old) {
+    const oldKey = old._key, newKey = `li/${list}/${old.id}`, hadDue = !!old.due;
+    listOp(() => Object.assign(old, data, { _key: newKey }), async () => {
+      await saveItem({ ...old, hadDue });
+      if (oldKey !== newKey) await api('items?key=' + encodeURIComponent(oldKey), { method: 'DELETE' });
+    });
+  } else {
+    const id = newId();
+    const item = { id, ...data, done: false, by: st.me, createdAt: Date.now(), doneAt: 0, _key: `li/${list}/${id}` };
+    listOp(() => st.items.push(item), () => saveItem(item));
+  }
+  if (data.due) toast('Salvato ✓ — lo trovi anche nel calendario');
+});
+$('#itemDel').onclick = () => {
+  const it = itemEditing; if (!it) return;
+  closeSheet($('#itemSheet'));
+  listOp(() => { st.items = st.items.filter(i => i !== it); }, () => api('items?key=' + encodeURIComponent(it._key), { method: 'DELETE' }));
+};
+$('#addDetailed').onclick = () => {
+  const input = $('#addItemForm').entry, text = input.value.trim();
+  input.value = '';
+  openItem(null, { text, list: curList(), due: todayStr() });
+};
 
 // ---------- ricerca ----------
 let searchT = null, searchSeq = 0;

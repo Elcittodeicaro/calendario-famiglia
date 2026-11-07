@@ -38,6 +38,7 @@ export function shortDate(s: string) {
   return `${GIORNI[d.getUTCDay()]} ${d.getUTCDate()} ${MESI[d.getUTCMonth()]}`;
 }
 export function whenLabel(ev: any) {
+  if (ev.endDate && ev.endDate > ev.date) return `da ${shortDate(ev.date)} a ${shortDate(ev.endDate)}`;
   let t = shortDate(ev.date);
   if (!ev.allDay && ev.start) t += ` alle ${ev.start}`;
   if (REPEAT_LABEL[ev.repeat]) t += ` (${REPEAT_LABEL[ev.repeat]})`;

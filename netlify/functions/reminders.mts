@@ -1,5 +1,5 @@
 import type { Config } from "@netlify/functions";
-import { store, readPrefix, listSubs, sendPush, expand, fireAt, localDate, addDays } from "../lib/shared.mts";
+import { store, readPrefix, listSubs, sendPush, expand, fireAt, localDate, addDays, zoned } from "../lib/shared.mts";
 
 // Gira ogni 5 minuti e manda i promemoria degli impegni ai telefoni che li hanno attivati.
 // Per consumare poco, ricalcola i promemoria in arrivo al massimo una volta l'ora
@@ -22,8 +22,32 @@ async function compute(now: number, tz: string): Promise<Due[]> {
   const from = addDays(today, -1);
   const to = addDays(today, 2);
   const months = [...new Set([from, today, to].map((d) => d.slice(0, 7)))];
-  const events = [...(await Promise.all(months.map((m) => readPrefix(`ev/${m}/`)))).flat(), ...(await readPrefix("rec/"))];
+  const spanKeys = (await store().list({ prefix: "span/" })).blobs.map((b) => b.key).filter((k) => {
+    const st = k.slice(5, 15);
+    return st >= from && st <= to; // il promemoria è sul primo giorno
+  });
+  const [single, rec, spans, items, lists] = await Promise.all([
+    Promise.all(months.map((m) => readPrefix(`ev/${m}/`))),
+    readPrefix("rec/"),
+    Promise.all(spanKeys.map((k) => store().get(k, { type: "json" }))),
+    readPrefix("li/"),
+    store().get("lists", { type: "json" }) as Promise<any[] | null>,
+  ]);
+  const events = [...single.flat(), ...rec, ...spans.filter(Boolean)];
   const due: Due[] = [];
+  // Voci delle liste con scadenza: alle 9 del giorno, o un'ora prima dell'orario indicato
+  const listName = new Map((lists || [{ id: "spesa", name: "Spesa" }, { id: "dafare", name: "Da fare" }]).map((l: any) => [l.id, l.name]));
+  for (const it of items) {
+    if (it.done || !it.due || it.due < from || it.due > to) continue;
+    const at = it.dueTime ? zoned(it.due, it.dueTime, tz) - 60 * 60000 : zoned(it.due, "09:00", tz);
+    if (at < now - LOOKBACK || at > now + AHEAD) continue;
+    const day = localDate(at, tz) === it.due ? "oggi" : "domani";
+    due.push({
+      id: `li|${it.id}|${it.due}|${it.dueTime || ""}`, at, occ: it.due,
+      title: `Da fare: ${it.text}`,
+      body: [`Entro ${day}${it.dueTime ? " alle " + it.dueTime : ""}`, listName.get(it.list)].filter(Boolean).join(" · "),
+    });
+  }
   for (const ev of events) {
     for (const occ of expand(ev, from, to)) {
       const at = fireAt(ev, occ, tz);

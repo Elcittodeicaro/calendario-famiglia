@@ -31,7 +31,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const ID_RE = /^[a-z0-9-]{6,40}$/;
-const KEY_RE = /^(ev\/\d{4}-\d{2}|rec)\/[a-z0-9-]{6,40}$/;
+const KEY_RE = /^(ev\/\d{4}-\d{2}|rec|span\/\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2})\/[a-z0-9-]{6,40}$/;
 const REPEATS = ["none", "daily", "weekly", "monthly", "yearly"];
 const ALERTS = ["none", "0", "15", "30", "60", "120", "1440", "morning"];
 const ids = (v: unknown) =>
@@ -63,10 +63,15 @@ function cleanEvent(body: any) {
   const allDay = !!body.allDay;
   const start = !allDay && TIME_RE.test(body.start) ? body.start : "";
   const end = !allDay && start && TIME_RE.test(body.end) ? body.end : "";
+  // Più giorni (solo se non si ripete), al massimo un anno
+  const endDate =
+    repeat === "none" && validDate(body.endDate) && body.endDate > body.date &&
+    Date.parse(body.endDate) - Date.parse(body.date) <= 366 * 864e5 ? (body.endDate as string) : "";
   return {
     id: typeof body.id === "string" && ID_RE.test(body.id) ? body.id : randomUUID(),
     title,
     date: body.date as string,
+    endDate,
     allDay: allDay || !start,
     start,
     end,
@@ -83,8 +88,23 @@ function cleanEvent(body: any) {
   };
 }
 
-const keyFor = (ev: { id: string; date: string; repeat: string }) =>
-  ev.repeat === "none" ? `ev/${ev.date.slice(0, 7)}/${ev.id}` : `rec/${ev.id}`;
+const keyFor = (ev: { id: string; date: string; endDate?: string; repeat: string }) =>
+  ev.repeat !== "none" ? `rec/${ev.id}` : ev.endDate ? `span/${ev.date}_${ev.endDate}/${ev.id}` : `ev/${ev.date.slice(0, 7)}/${ev.id}`;
+
+// Impegni su più giorni che toccano l'intervallo [from, to] (le date sono nella chiave)
+async function readSpans(from: string, to: string) {
+  const s = store();
+  const { blobs } = await s.list({ prefix: "span/" });
+  const keys = blobs.map((b) => b.key).filter((k) => {
+    const m = /^span\/(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\//.exec(k);
+    return m && m[1] <= to && m[2] >= from;
+  });
+  const items = await Promise.all(keys.map(async (k) => {
+    const v = await s.get(k, { type: "json" });
+    return v ? { ...(v as object), _key: k } : null;
+  }));
+  return items.filter(Boolean);
+}
 
 const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
@@ -136,14 +156,18 @@ export default async (req: Request, context: Context) => {
         .split(",")
         .filter((m) => MONTH_RE.test(m))
         .slice(0, 24);
-      const [monthLists, rec, settings] = await Promise.all([
+      const sorted = [...months].sort();
+      const [monthLists, rec, settings, spans, lists, items] = await Promise.all([
         Promise.all(months.map((m) => readPrefix(`ev/${m}/`))),
         readPrefix("rec/"),
         s.get("settings", { type: "json" }),
+        sorted.length ? readSpans(`${sorted[0]}-01`, `${sorted[sorted.length - 1]}-31`) : Promise.resolve([]),
+        s.get("lists", { type: "json" }),
+        readPrefix("li/"),
       ]);
       const byMonth: Record<string, unknown[]> = {};
       months.forEach((m, i) => (byMonth[m] = monthLists[i]));
-      return json({ months: byMonth, rec, settings: settings || DEFAULT_SETTINGS });
+      return json({ months: byMonth, rec, spans, settings: settings || DEFAULT_SETTINGS, lists: lists || DEFAULT_LISTS, items });
     }
 
     if (route === "events" && req.method === "POST") {
@@ -172,7 +196,7 @@ export default async (req: Request, context: Context) => {
     if (route === "search" && req.method === "GET") {
       const q = norm(str(url.searchParams.get("q"), 60));
       if (q.length < 2) return json({ results: [] });
-      const all = [...(await readPrefix("ev/")), ...(await readPrefix("rec/"))];
+      const all = [...(await readPrefix("ev/")), ...(await readPrefix("rec/")), ...(await readPrefix("span/"))];
       const results = all.filter((e: any) => norm(`${e.title} ${e.note || ""}`).includes(q)).slice(0, 200);
       return json({ results });
     }
@@ -242,6 +266,7 @@ export default async (req: Request, context: Context) => {
       await s.setJSON("lists", lists);
       const { blobs } = await s.list({ prefix: `li/${id}/` });
       await Promise.all(blobs.map((b) => s.delete(b.key)));
+      await s.delete("remcache");
       return json({ lists });
     }
 
@@ -260,10 +285,14 @@ export default async (req: Request, context: Context) => {
         by: str(body.by, 40),
         createdAt: typeof body.createdAt === "number" ? body.createdAt : Date.now(),
         doneAt: done ? (typeof body.doneAt === "number" && body.doneAt ? body.doneAt : Date.now()) : 0,
+        due: validDate(body.due) ? (body.due as string) : "",
+        dueTime: validDate(body.due) && TIME_RE.test(body.dueTime) ? (body.dueTime as string) : "",
+        care: ids(body.care),
         updatedAt: Date.now(),
       };
       const key = `li/${list}/${item.id}`;
       await s.setJSON(key, item);
+      if (item.due || body.hadDue) await s.delete("remcache");
       return json({ ...item, _key: key });
     }
 
@@ -271,6 +300,7 @@ export default async (req: Request, context: Context) => {
       const key = url.searchParams.get("key") || "";
       if (!ITEM_KEY_RE.test(key)) return json({ error: "Voce non valida" }, 400);
       await s.delete(key);
+      await s.delete("remcache");
       return json({ ok: true });
     }
 
