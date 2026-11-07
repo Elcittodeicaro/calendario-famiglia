@@ -24,6 +24,9 @@ const MONTH_RE = /^\d{4}-\d{2}$/;
 const ID_RE = /^[a-z0-9-]{6,40}$/;
 const KEY_RE = /^(ev\/\d{4}-\d{2}|rec)\/[a-z0-9-]{6,40}$/;
 const REPEATS = ["none", "daily", "weekly", "monthly", "yearly"];
+const ALERTS = ["none", "0", "15", "30", "60", "120", "1440", "morning"];
+const ids = (v: unknown) =>
+  Array.isArray(v) ? v.filter((w): w is string => typeof w === "string").slice(0, 12).map((w) => w.slice(0, 40)) : [];
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -58,7 +61,9 @@ function cleanEvent(body: any) {
     allDay: allDay || !start,
     start,
     end,
-    who: Array.isArray(body.who) ? body.who.filter((w: unknown) => typeof w === "string").slice(0, 12).map((w: string) => w.slice(0, 40)) : [],
+    who: ids(body.who),
+    care: ids(body.care),
+    alert: ALERTS.includes(body.alert) ? body.alert : allDay || !start ? "morning" : "60",
     note: str(body.note, 2000),
     repeat,
     until: repeat !== "none" && validDate(body.until) ? body.until : "",

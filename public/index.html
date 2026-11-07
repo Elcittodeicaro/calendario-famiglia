@@ -108,6 +108,14 @@ body[data-view=week] .title-row h1{font-size:21px;margin:0 2px}
 .chip{font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;
   background:color-mix(in srgb,var(--c) 16%,transparent);color:color-mix(in srgb,var(--c) 82%,var(--ink))}
 .rep{font-size:12px;color:var(--muted)}
+.ev-care{font-size:13px;margin-top:4px;color:var(--ink)}
+.ev-care b{font-weight:700}
+.filters{display:flex;gap:6px;overflow-x:auto;margin:10px -14px 0;padding:0 14px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.filters::-webkit-scrollbar{display:none}
+.fchip{flex:none;font-size:14px;font-weight:600;padding:5px 12px;border-radius:99px;background:var(--soft);color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.fchip i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.fchip.on{background:var(--ink);color:var(--bg)}
+a.btn-wide{text-decoration:none;color:inherit;box-sizing:border-box}
 .ev-note{font-size:14px;color:var(--muted);margin-top:5px;white-space:pre-wrap;overflow-wrap:anywhere}
 .empty{color:var(--muted);text-align:center;padding:26px 10px;font-size:15px}
 .link{color:var(--ink);font-weight:600;margin-top:8px;padding:8px 14px;border-radius:99px;background:var(--soft)}
@@ -222,6 +230,7 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
       <button data-view="week">Settimana</button>
       <button data-view="agenda">Prossimi</button>
     </div>
+    <div class="filters" id="filters"></div>
   </header>
 
   <main>
@@ -255,6 +264,9 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
     <div class="label">Per chi</div>
     <div class="group"><div class="who" id="whoPicker"></div></div>
 
+    <div class="label">Chi se ne occupa</div>
+    <div class="group"><div class="who" id="carePicker"></div></div>
+
     <div class="label">Quando</div>
     <div class="group">
       <div class="row"><span id="dateLabel">Giorno</span><input type="date" name="date" required></div>
@@ -270,6 +282,7 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
         </select>
       </div>
       <div class="row" id="untilRow"><span>Fino al</span><input type="date" name="until"></div>
+      <div class="row"><span>Avviso</span><select name="alert"></select></div>
     </div>
     <div class="hint" id="seriesHint" hidden>Le modifiche valgono per tutta la serie.</div>
 
@@ -307,6 +320,11 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
       <button type="button" class="add-person" id="addPerson">+ Aggiungi persona</button>
     </div>
     <div class="hint">Tocca il pallino per cambiare colore. Puoi scrivere i nomi dei bimbi.</div>
+
+    <div class="label">Calendario dell'iPhone</div>
+    <a class="btn-wide" id="icsBtn" href="#">Aggiungi al Calendario dell'iPhone</a>
+    <div class="hint">Gli impegni compaiono anche nel Calendario di Apple e si aggiornano da soli (a volte ci vuole qualche minuto). Quando l'iPhone lo chiede, <b>spegni "Rimuovi avvisi"</b> per ricevere i promemoria. Si modificano solo da qui.</div>
+    <button type="button" class="btn-wide" id="icsCopy">Copia link del calendario</button>
 
     <div class="label">Invita tua moglie</div>
     <div class="group">
@@ -374,6 +392,7 @@ const st = {
   code: ls.get('codice', ''),
   me: ls.get('nome', ''),
   view: ls.get('vista', 'month'),
+  filter: ls.get('filtro', ''),
   y: now.getFullYear(), m: now.getMonth(), sel: todayStr(),
   months: {}, rec: [], settings: DEFAULT_SETTINGS,
   loaded: new Set(),
@@ -464,7 +483,11 @@ function occurrences(from, to) {
     for (const ev of list) if (ev.date >= from && ev.date <= to) (out[ev.date] = out[ev.date] || []).push({ ...ev, occ: ev.date });
   }
   for (const ev of st.rec) expand(ev, from, to, out);
-  for (const d in out) out[d].sort(byTime);
+  const f = st.filter && person(st.filter) ? st.filter : '';
+  for (const d in out) {
+    if (f) { out[d] = out[d].filter(e => (e.who || []).includes(f) || (e.care || []).includes(f)); if (!out[d].length) { delete out[d]; continue; } }
+    out[d].sort(byTime);
+  }
   return out;
 }
 function findEvent(key) {
@@ -492,7 +515,19 @@ function evHtml(e) {
     <div class="ev-time">${time}</div>
     <div class="ev-body"><div class="ev-title">${esc(e.title)}</div>
     ${chips || rep ? `<div class="ev-meta">${chips}${rep}</div>` : ''}
+    ${careHtml(e)}
     ${e.note ? `<div class="ev-note">${esc(e.note)}</div>` : ''}</div></div>`;
+}
+function careHtml(e) {
+  const names = (e.care || []).map(person).filter(Boolean).map(p => esc(p.name));
+  if (!names.length) return '';
+  const list = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' e ' + names[names.length - 1];
+  return `<div class="ev-care">${names.length === 1 ? 'Ci pensa' : 'Ci pensano'} <b>${list}</b></div>`;
+}
+function renderFilters() {
+  if (st.filter && !person(st.filter)) st.filter = '';
+  $('#filters').innerHTML = `<button class="fchip${st.filter ? '' : ' on'}" data-f="">Tutti</button>` +
+    people().map(p => `<button class="fchip${st.filter === p.id ? ' on' : ''}" style="--c:${p.color}" data-f="${esc(p.id)}"><i></i>${esc(p.name)}</button>`).join('');
 }
 function renderMonth() {
   $('#monthTitle').innerHTML = `${cap(MONTHS[st.m])} <span>${st.y}</span>`;
@@ -547,6 +582,7 @@ function render() {
   $('#monthView').hidden = st.view !== 'month';
   $('#weekView').hidden = st.view !== 'week';
   $('#agendaView').hidden = st.view !== 'agenda';
+  renderFilters();
   if (st.view === 'month') renderMonth(); else if (st.view === 'week') renderWeek(); else renderAgenda();
 }
 
@@ -566,6 +602,10 @@ function goWeek(n) {
 const step = n => (st.view === 'week' ? goWeek(n) : goMonth(n));
 $('#prev').onclick = () => step(-1);
 $('#next').onclick = () => step(1);
+$('#filters').addEventListener('click', e => {
+  const b = e.target.closest('[data-f]'); if (!b) return;
+  st.filter = b.dataset.f; ls.set('filtro', st.filter); render();
+});
 $('#weekView').addEventListener('click', e => {
   const b = e.target.closest('[data-sel]'); if (!b) return;
   st.sel = b.dataset.sel; const d = pd(st.sel); st.y = d.getFullYear(); st.m = d.getMonth();
@@ -618,22 +658,30 @@ function toast(msg) {
 
 // ---------- editor impegno ----------
 const F = $('#evForm');
-let editing = null, whoSel = new Set();
-function renderWho() {
-  $('#whoPicker').innerHTML = people().map(p =>
-    `<button type="button" class="pick${whoSel.has(p.id) ? ' on' : ''}" style="--c:${p.color}" data-id="${esc(p.id)}">${esc(p.name)}</button>`).join('');
-}
-$('#whoPicker').addEventListener('click', e => {
-  const b = e.target.closest('.pick'); if (!b) return;
-  whoSel.has(b.dataset.id) ? whoSel.delete(b.dataset.id) : whoSel.add(b.dataset.id);
-  renderWho();
+let editing = null, whoSel = new Set(), careSel = new Set();
+const pickHtml = set => people().map(p =>
+  `<button type="button" class="pick${set.has(p.id) ? ' on' : ''}" style="--c:${p.color}" data-id="${esc(p.id)}">${esc(p.name)}</button>`).join('');
+function renderWho() { $('#whoPicker').innerHTML = pickHtml(whoSel); $('#carePicker').innerHTML = pickHtml(careSel); }
+[['#whoPicker', () => whoSel], ['#carePicker', () => careSel]].forEach(([sel, get]) => {
+  $(sel).addEventListener('click', e => {
+    const b = e.target.closest('.pick'); if (!b) return;
+    const set = get(); set.has(b.dataset.id) ? set.delete(b.dataset.id) : set.add(b.dataset.id);
+    renderWho();
+  });
 });
+const ALERTS_TIMED = [['none', 'Nessuno'], ['0', "All'ora dell'impegno"], ['15', '15 minuti prima'], ['30', '30 minuti prima'], ['60', '1 ora prima'], ['120', '2 ore prima'], ['1440', 'Il giorno prima']];
+const ALERTS_DAY = [['none', 'Nessuno'], ['morning', 'Quel giorno alle 8'], ['1440', 'Il giorno prima alle 9']];
+function fillAlerts(value) {
+  const list = F.allDay.checked ? ALERTS_DAY : ALERTS_TIMED;
+  F.alert.innerHTML = list.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+  F.alert.value = list.some(([v]) => v === value) ? value : (F.allDay.checked ? 'morning' : '60');
+}
 function syncFormRows() {
   $('#timeRow').hidden = F.allDay.checked;
   $('#untilRow').hidden = F.repeat.value === 'none';
   $('#dateLabel').textContent = F.repeat.value === 'none' ? 'Giorno' : 'A partire dal';
 }
-F.allDay.onchange = syncFormRows;
+F.allDay.onchange = () => { fillAlerts(F.alert.value); syncFormRows(); };
 F.repeat.onchange = syncFormRows;
 F.start.onchange = () => {
   if (!F.start.value) return;
@@ -653,8 +701,9 @@ function openEditor(ev, occ, date) {
   F.repeat.value = ev ? ev.repeat : 'none';
   F.until.value = ev ? (ev.until || '') : '';
   F.note.value = ev ? (ev.note || '') : '';
-  whoSel = new Set(ev ? (ev.who || []) : []);
-  if (!ev && st.me) { const mine = people().find(p => p.name.toLowerCase() === st.me.toLowerCase()); if (mine) whoSel.add(mine.id); }
+  whoSel = new Set(ev ? (ev.who || []) : (st.filter ? [st.filter] : []));
+  careSel = new Set(ev ? (ev.care || []) : []);
+  fillAlerts(ev && ev.alert ? ev.alert : '');
   renderWho(); syncFormRows();
   $('#seriesHint').hidden = !(ev && ev.repeat !== 'none');
   $('#deleteBtn').hidden = !ev;
@@ -681,7 +730,7 @@ F.addEventListener('submit', async e => {
   const body = {
     ...(old ? { id: old.id, _key: old._key, createdAt: old.createdAt, skip: old.skip || [], by: old.by } : { by: st.me }),
     title: F.what.value.trim(), date: F.date.value, allDay: F.allDay.checked,
-    start: F.start.value, end: F.end.value, who: [...whoSel],
+    start: F.start.value, end: F.end.value, who: [...whoSel], care: [...careSel], alert: F.alert.value,
     repeat: F.repeat.value, until: F.until.value, note: F.note.value,
   };
   if (!body.title) { toast('Scrivi cosa c\'è da fare'); F.what.focus(); return; }
@@ -736,6 +785,9 @@ $('#deleteBtn').onclick = () => {
 const S = $('#setForm');
 let draft = [];
 const shareLink = () => `${location.origin}/?k=${encodeURIComponent(st.code)}`;
+const icsLink = () => `${location.origin}/calendario.ics?k=${encodeURIComponent(st.code)}`;
+$('#icsBtn').onclick = e => { e.preventDefault(); location.href = icsLink().replace(/^https?:/, 'webcal:'); };
+$('#icsCopy').onclick = async () => { try { await navigator.clipboard.writeText(icsLink()); toast('Link copiato'); } catch { toast(icsLink()); } };
 function renderPeople() {
   $('#peopleList').innerHTML = draft.map((p, i) => `<div class="prow">
     <button type="button" class="swatch" style="background:${p.color}" data-i="${i}" aria-label="Cambia colore"></button>
