@@ -1,6 +1,6 @@
 // Permette di aprire l'app anche senza rete (mostra gli ultimi dati salvati).
 // Prima prova sempre la rete, così gli aggiornamenti arrivano subito.
-const CACHE = 'calendario-v3';
+const CACHE = 'calendario-v4';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon-180.png', '/icon-192.png'];
 
 self.addEventListener('install', e => {
@@ -21,4 +21,24 @@ self.addEventListener('fetch', e => {
       })
       .catch(() => caches.match(e.request, { ignoreSearch: true }).then(r => r || caches.match('/')))
   );
+});
+
+// ---------- notifiche ----------
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Calendario', {
+    body: d.body || '', tag: d.tag || undefined, data: { url: d.url || '/' },
+    icon: '/icon-192.png', badge: '/icon-192.png',
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) {
+      if ('focus' in c) { c.postMessage({ type: 'open', url }); return c.focus(); }
+    }
+    return self.clients.openWindow(url);
+  }));
 });

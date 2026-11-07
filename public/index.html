@@ -40,8 +40,9 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
   .top{background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 }
 .title-row{display:flex;align-items:center;gap:4px}
-.title-row h1{margin:0 4px;font-size:27px;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
-.title-row h1 span{color:var(--muted);font-weight:600}
+.title-row h1{margin:0 2px;font-size:clamp(22px,6.6vw,27px);font-weight:800;letter-spacing:-.02em;white-space:nowrap;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.title-row h1 span{color:var(--muted);font-weight:600;font-size:.72em}
+.title-row .nav,.title-row .icon-btn,.title-row .pill{flex:none}
 .nav{width:36px;height:36px;border-radius:50%;display:grid;place-items:center}
 .nav:active,.icon-btn:active{background:var(--soft)}
 .nav svg,.icon-btn svg{width:22px;height:22px}
@@ -116,10 +117,16 @@ body[data-view=week] .title-row h1{font-size:21px;margin:0 2px}
 .fchip i{width:8px;height:8px;border-radius:50%;background:var(--c)}
 .fchip.on{background:var(--ink);color:var(--bg)}
 a.btn-wide{text-decoration:none;color:inherit;box-sizing:border-box}
+.row>.grow{flex:1 1 auto;min-width:0}
+.sr{padding:0 16px 24px}
+.sr-date{font-size:13px;color:var(--muted);margin:12px 2px -2px}
+#searchSheet .sheet{min-height:75vh;min-height:75dvh}
+#searchForm{margin-top:12px}
+#searchForm input{-webkit-appearance:none;appearance:none}
 .fchip small{font-size:12px;opacity:.7}
 
 /* ---------- liste ---------- */
-body[data-view=lists] .nav,body[data-view=lists] #todayBtn,body[data-view=lists] .filters,body[data-view=lists] .fab{display:none}
+body[data-view=lists] .nav,body[data-view=lists] #todayBtn,body[data-view=lists] #searchBtn,body[data-view=lists] .filters,body[data-view=lists] .fab{display:none}
 .ls-wrap{padding:2px 14px 130px}
 .ls-tabs{display:flex;gap:6px;overflow-x:auto;margin:10px -14px 12px;padding:0 14px;scrollbar-width:none}
 .ls-tabs::-webkit-scrollbar{display:none}
@@ -242,6 +249,7 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
       <h1 id="monthTitle"></h1>
       <button class="nav" id="next" aria-label="Mese successivo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
       <div class="spacer"></div>
+      <button class="icon-btn" id="searchBtn" aria-label="Cerca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg></button>
       <button class="pill" id="todayBtn">Oggi</button>
       <button class="icon-btn" id="settingsBtn" aria-label="Impostazioni">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
@@ -281,6 +289,15 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
   </main>
 
   <button class="fab" id="addBtn" aria-label="Nuovo impegno"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</div>
+
+<!-- RICERCA -->
+<div class="overlay" id="searchSheet">
+  <div class="sheet">
+    <div class="sheet-head"><button type="button" class="l" data-close>Chiudi</button><h3>Cerca</h3><span></span></div>
+    <form id="searchForm" class="group" autocomplete="off"><input id="searchInput" class="title-input" type="search" placeholder="Pediatra, piscina, compleanno…" enterkeyhint="search"></form>
+    <div id="searchResults" class="sr"></div>
+  </div>
 </div>
 
 <!-- FOGLIO IMPEGNO -->
@@ -363,6 +380,15 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
       <button type="button" class="add-person" id="addPerson">+ Aggiungi persona</button>
     </div>
     <div class="hint">Tocca il pallino per cambiare colore. Puoi scrivere i nomi dei bimbi.</div>
+
+    <div class="label">Notifiche su questo telefono</div>
+    <div class="group">
+      <div class="row"><span class="grow" id="pushInfo" style="color:var(--muted);font-size:14px"></span></div>
+      <label class="row"><span class="grow">Quando l'altro aggiunge, cambia o elimina un impegno</span><input type="checkbox" class="switch" id="pushChanges"></label>
+      <label class="row"><span class="grow">Promemoria prima degli impegni</span><input type="checkbox" class="switch" id="pushReminders"></label>
+    </div>
+    <div class="hint">I promemoria seguono il campo «Avviso» di ogni impegno. Se ricevi già gli avvisi dal Calendario dell'iPhone, lasciali spenti qui per non averli doppi.</div>
+    <button type="button" class="btn-wide" id="pushTest" hidden>Invia una notifica di prova</button>
 
     <div class="label">Calendario dell'iPhone</div>
     <a class="btn-wide" id="icsBtn" href="#">Aggiungi al Calendario dell'iPhone</a>
@@ -450,10 +476,15 @@ if (cached && st.code) {
 const persist = () => ls.set('dati', { months: st.months, rec: st.rec, settings: st.settings, lists: st.lists, items: st.items });
 
 // ---------- server ----------
+const deviceId = (() => {
+  let d = ls.get('device', '');
+  if (!d) { d = Date.now().toString(36) + Math.random().toString(36).slice(2, 8); ls.set('device', d); }
+  return d;
+})();
 async function api(path, opts = {}) {
   const res = await fetch('/api/' + path, {
     ...opts,
-    headers: { 'content-type': 'application/json', 'x-codice': st.code },
+    headers: { 'content-type': 'application/json', 'x-codice': st.code, 'x-device': deviceId, 'x-nome': encodeURIComponent(st.me || '') },
     cache: 'no-store',
   });
   if (res.status === 401) { const e = new Error('Codice non valido'); e.auth = true; throw e; }
@@ -579,7 +610,7 @@ function renderFilters() {
     people().map(p => `<button class="fchip${st.filter === p.id ? ' on' : ''}" style="--c:${p.color}" data-f="${esc(p.id)}"><i></i>${esc(p.name)}</button>`).join('');
 }
 function renderMonth() {
-  $('#monthTitle').innerHTML = `${cap(MONTHS[st.m])} <span>${st.y}</span>`;
+  $('#monthTitle').innerHTML = cap(MONTHS[st.m]) + (st.y !== new Date().getFullYear() ? ` <span>${st.y}</span>` : '');
   const offset = (new Date(st.y, st.m, 1).getDay() + 6) % 7;
   const gridStart = ds(new Date(st.y, st.m, 1 - offset));
   const days = new Date(st.y, st.m + 1, 0).getDate();
@@ -684,7 +715,11 @@ let tx = null, ty = null;
 });
 document.addEventListener('click', e => {
   const ev = e.target.closest('.ev');
-  if (ev) { const found = findEvent(ev.dataset.key); if (found) openEditor(found, ev.dataset.occ); return; }
+  if (ev) {
+    const found = findEvent(ev.dataset.key) || (st.searchRes || []).find(x => x._key === ev.dataset.key);
+    if (found) openEditor(found, ev.dataset.occ);
+    return;
+  }
   const add = e.target.closest('[data-add]');
   if (add) openEditor(null, null, add.dataset.add || null);
 });
@@ -695,6 +730,7 @@ const anySheetOpen = () => $$('.overlay.open').length > 0;
 function openSheet(el) { el.classList.add('open'); document.body.classList.add('locked'); }
 function closeSheet(el) {
   el.classList.remove('open');
+  if (el.id !== 'searchSheet' && $('#searchSheet').classList.contains('open')) runSearch();
   if (!anySheetOpen()) { document.body.classList.remove('locked'); render(); }
 }
 $$('.overlay').forEach(o => {
@@ -945,6 +981,118 @@ $('#listsView').addEventListener('click', e => {
     () => listOp(() => { st.items = st.items.filter(i => i !== item); }, () => api('items?key=' + encodeURIComponent(item._key), { method: 'DELETE' })));
 });
 
+// ---------- ricerca ----------
+let searchT = null, searchSeq = 0;
+st.searchRes = [];
+$('#searchBtn').onclick = () => {
+  $('#searchInput').value = '';
+  $('#searchResults').innerHTML = '<div class="empty">Scrivi almeno 2 lettere.</div>';
+  openSheet($('#searchSheet'));
+  setTimeout(() => $('#searchInput').focus(), 250);
+};
+$('#searchInput').addEventListener('input', () => { clearTimeout(searchT); searchT = setTimeout(runSearch, 300); });
+$('#searchForm').addEventListener('submit', e => { e.preventDefault(); clearTimeout(searchT); runSearch(); $('#searchInput').blur(); });
+async function runSearch() {
+  const q = $('#searchInput').value.trim(), seq = ++searchSeq;
+  if (q.length < 2) { $('#searchResults').innerHTML = '<div class="empty">Scrivi almeno 2 lettere.</div>'; return; }
+  try {
+    const { results } = await api('search?q=' + encodeURIComponent(q));
+    if (seq !== searchSeq) return;
+    st.searchRes = results || [];
+    const today = todayStr(), horizon = addDays(today, 400);
+    const rows = st.searchRes.map(e => {
+      let d = e.date;
+      if (e.repeat !== 'none') { const o = {}; expand(e, today, horizon, o); const n = Object.keys(o).sort()[0]; if (n) d = n; }
+      return { e, d };
+    });
+    const next = rows.filter(r => r.d >= today).sort((a, b) => a.d.localeCompare(b.d) || byTime(a.e, b.e));
+    const past = rows.filter(r => r.d < today).sort((a, b) => b.d.localeCompare(a.d));
+    const block = (title, list) => list.length
+      ? `<h3 class="ag-day">${title}</h3>` + list.map(r => `<div class="sr-date">${esc(dayLabel(r.d))}</div>` + evHtml({ ...r.e, occ: r.d })).join('') : '';
+    $('#searchResults').innerHTML = (block('Prossimi', next) + block('Passati', past)) || '<div class="empty">Nessun impegno trovato.</div>';
+  } catch (err) {
+    if (seq === searchSeq) $('#searchResults').innerHTML = `<div class="empty">${esc(netMsg(err))}</div>`;
+  }
+}
+
+// ---------- notifiche ----------
+const pushOK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const standalone = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let vapidKey = '';
+const pushPrefs = () => ls.get('push', { changes: false, reminders: false });
+const tzName = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } };
+function b64ToBytes(b64) {
+  const raw = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+async function currentSub() {
+  if (!pushOK) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+const subscribeBody = (sub, p) => JSON.stringify({ subscription: sub.toJSON(), deviceId, name: st.me, tz: tzName(), ...p });
+function pushUI() {
+  const p = pushPrefs(), ch = $('#pushChanges'), re = $('#pushReminders');
+  ch.checked = !!p.changes; re.checked = !!p.reminders;
+  let info, disabled = false;
+  if (!pushOK) {
+    disabled = true;
+    info = isIOS && !standalone ? "Per ricevere le notifiche apri l'app dall'icona sulla schermata Home (serve iOS 16.4 o più recente)." : 'Questo browser non supporta le notifiche.';
+  } else if (Notification.permission === 'denied') {
+    disabled = true;
+    info = 'Notifiche bloccate: riattivale in Impostazioni › Notifiche › Calendario.';
+  } else {
+    info = (p.changes || p.reminders) && Notification.permission === 'granted' ? 'Notifiche attive su questo telefono.' : 'Scegli quali notifiche ricevere su questo telefono.';
+  }
+  $('#pushInfo').textContent = info;
+  ch.disabled = re.disabled = disabled;
+  $('#pushTest').hidden = !(pushOK && Notification.permission === 'granted' && (p.changes || p.reminders));
+  if (pushOK && !vapidKey) api('push/key').then(d => { vapidKey = d.key || ''; }).catch(() => {});
+}
+async function applyPush() {
+  const p = { changes: $('#pushChanges').checked, reminders: $('#pushReminders').checked };
+  try {
+    if (!p.changes && !p.reminders) {
+      const sub = await currentSub();
+      if (sub) {
+        await api('push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: sub.endpoint }) }).catch(() => {});
+        await sub.unsubscribe().catch(() => {});
+      }
+      ls.set('push', p); pushUI(); toast('Notifiche spente'); return;
+    }
+    if (Notification.permission !== 'granted') {
+      const perm = await Notification.requestPermission(); // deve partire subito dal tocco
+      if (perm !== 'granted') { pushUI(); toast('Permesso non concesso'); return; }
+    }
+    if (!vapidKey) vapidKey = (await api('push/key')).key || '';
+    if (!vapidKey) throw new Error('Notifiche non ancora pronte sul server');
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(vapidKey) }));
+    await api('push/subscribe', { method: 'POST', body: subscribeBody(sub, p) });
+    ls.set('push', p); pushUI(); toast('Notifiche attivate ✓');
+  } catch (err) {
+    pushUI();
+    if (err.auth) return logout('Il codice non è più valido.');
+    toast(netMsg(err));
+  }
+}
+$('#pushChanges').onchange = applyPush;
+$('#pushReminders').onchange = applyPush;
+$('#pushTest').onclick = async () => {
+  try {
+    const sub = await currentSub();
+    if (!sub) throw new Error('Questo telefono non è iscritto');
+    await api('push/test', { method: 'POST', body: JSON.stringify({ endpoint: sub.endpoint }) });
+    toast('Inviata: arriva tra qualche secondo');
+  } catch (err) { toast(netMsg(err)); }
+};
+async function refreshPush() { // all'avvio tiene aggiornata l'iscrizione (nome, fuso, preferenze)
+  const p = pushPrefs();
+  if (!pushOK || !(p.changes || p.reminders) || Notification.permission !== 'granted') return;
+  try { const sub = await currentSub(); if (sub) await api('push/subscribe', { method: 'POST', body: subscribeBody(sub, p) }); } catch {}
+}
+
 // ---------- impostazioni ----------
 const S = $('#setForm');
 let draft = [];
@@ -976,6 +1124,7 @@ $('#settingsBtn').onclick = () => {
   S.me.value = st.me;
   $('#codeBox').textContent = st.code;
   renderPeople();
+  pushUI();
   openSheet($('#setSheet'));
 };
 S.addEventListener('submit', async e => {
@@ -1031,8 +1180,24 @@ L.addEventListener('submit', async e => {
 });
 function start() {
   $('#login').hidden = true; $('#app').hidden = false;
-  render(); load(true);
+  const d = new URLSearchParams(location.search).get('d');
+  if (d) {
+    selectDate(d);
+    try { const u = new URL(location.href); u.searchParams.delete('d'); history.replaceState(null, '', u); } catch {}
+  }
+  render(); load(true); refreshPush();
 }
+function selectDate(d) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  st.sel = d; const x = pd(d); st.y = x.getFullYear(); st.m = x.getMonth();
+  if (st.view === 'agenda' || st.view === 'lists') st.view = 'week';
+  return true;
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => {
+  if (!e.data || e.data.type !== 'open') return;
+  const d = new URL(e.data.url, location.origin).searchParams.get('d');
+  if (d && selectDate(d)) { $$('.overlay.open').forEach(o => o.classList.remove('open')); document.body.classList.remove('locked'); render(); load(); }
+});
 
 // ---------- aggiornamento automatico ----------
 // Dati: ogni 30 secondi e quando riapri l'app.

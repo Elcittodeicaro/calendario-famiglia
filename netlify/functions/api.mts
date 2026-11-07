@@ -1,13 +1,15 @@
-import { getStore } from "@netlify/blobs";
 import type { Config, Context } from "@netlify/functions";
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { store, readPrefix, whenLabel, subKey, vapidPublicKey, listSubs, sendPush, expand, addDays } from "../lib/shared.mts";
 
 // Tutti i dati stanno in un unico store privato del sito.
 // Chiavi:
 //   ev/AAAA-MM/<id>   eventi singoli, divisi per mese
 //   rec/<id>          eventi ricorrenti (ogni giorno / settimana / mese / anno)
 //   settings          persone e colori
-const store = () => getStore({ name: "calendario", consistency: "strong" });
+//   li/<lista>/<id>   voci delle liste condivise, lists = elenco liste
+//   push/<hash>       iscrizioni alle notifiche (una per telefono)
+//   remcache, remsent promemoria in arrivo / già inviati
 
 const DEFAULT_SETTINGS = {
   people: [
@@ -84,17 +86,38 @@ function cleanEvent(body: any) {
 const keyFor = (ev: { id: string; date: string; repeat: string }) =>
   ev.repeat === "none" ? `ev/${ev.date.slice(0, 7)}/${ev.id}` : `rec/${ev.id}`;
 
-async function readPrefix(prefix: string) {
-  const s = store();
-  const { blobs } = await s.list({ prefix });
-  const items = await Promise.all(
-    blobs.map(async (b) => {
-      const v = await s.get(b.key, { type: "json" });
-      return v ? { ...v, _key: b.key } : null;
-    }),
+const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+// Avvisa gli altri telefoni quando un impegno viene aggiunto, cambiato o eliminato.
+async function notifyChange(req: Request, action: "add" | "edit" | "del", ev: any) {
+  const device = req.headers.get("x-device") || "";
+  let name = "";
+  try { name = decodeURIComponent(req.headers.get("x-nome") || "").slice(0, 40); } catch {}
+  const subs = (await listSubs()).filter((x: any) => x.changes && x.deviceId !== device);
+  if (!subs.length) return;
+  const verb = { add: "ha aggiunto", edit: "ha modificato", del: "ha eliminato" }[action];
+  // Per gli impegni che si ripetono usa la prossima data, non quella d'inizio della serie.
+  let date = ev.date;
+  if (ev.repeat && ev.repeat !== "none") {
+    const today = new Date().toISOString().slice(0, 10);
+    date = expand(ev, today, addDays(today, 400))[0] || ev.date;
+  }
+  await Promise.all(
+    subs.map((sub: any) =>
+      sendPush(sub, {
+        title: `${name || "Qualcuno"} ${verb}`,
+        body: `${ev.title} · ${whenLabel({ ...ev, date })}`,
+        url: action === "del" ? "/" : `/?d=${date}`,
+        tag: `chg-${ev.id}`,
+      }),
+    ),
   );
-  return items.filter(Boolean);
 }
+const later = (context: Context, p: Promise<unknown>) => {
+  const safe = p.catch((e) => console.log("errore notifica", e));
+  if (context && typeof context.waitUntil === "function") context.waitUntil(safe);
+  else return safe;
+};
 
 export default async (req: Request, context: Context) => {
   if (!authorized(req)) return json({ error: "Codice non valido" }, 401);
@@ -130,14 +153,69 @@ export default async (req: Request, context: Context) => {
       await s.setJSON(key, ev);
       const oldKey = typeof body._key === "string" ? body._key : "";
       if (oldKey && oldKey !== key && KEY_RE.test(oldKey)) await s.delete(oldKey);
+      await s.delete("remcache");
+      await later(context, notifyChange(req, oldKey ? "edit" : "add", ev));
       return json({ ...ev, _key: key });
     }
 
     if (route === "events" && req.method === "DELETE") {
       const key = url.searchParams.get("key") || "";
       if (!KEY_RE.test(key)) return json({ error: "Chiave non valida" }, 400);
+      const old = await s.get(key, { type: "json" });
       await s.delete(key);
+      await s.delete("remcache");
+      if (old) await later(context, notifyChange(req, "del", old));
       return json({ ok: true });
+    }
+
+    // ---------- ricerca in tutti gli impegni ----------
+    if (route === "search" && req.method === "GET") {
+      const q = norm(str(url.searchParams.get("q"), 60));
+      if (q.length < 2) return json({ results: [] });
+      const all = [...(await readPrefix("ev/")), ...(await readPrefix("rec/"))];
+      const results = all.filter((e: any) => norm(`${e.title} ${e.note || ""}`).includes(q)).slice(0, 200);
+      return json({ results });
+    }
+
+    // ---------- notifiche ----------
+    if (route === "push/key" && req.method === "GET") {
+      return json({ key: vapidPublicKey() });
+    }
+
+    if (route === "push/subscribe" && req.method === "POST") {
+      const body = await req.json();
+      const sub = body.subscription || {};
+      const endpoint = typeof sub.endpoint === "string" && /^https:\/\//.test(sub.endpoint) ? sub.endpoint.slice(0, 1000) : "";
+      const keys = sub.keys && typeof sub.keys.p256dh === "string" && typeof sub.keys.auth === "string" ? { p256dh: sub.keys.p256dh.slice(0, 200), auth: sub.keys.auth.slice(0, 100) } : null;
+      if (!endpoint || !keys) return json({ error: "Iscrizione non valida" }, 400);
+      let tz = str(body.tz, 60) || "Europe/Madrid";
+      try { new Intl.DateTimeFormat("en", { timeZone: tz }); } catch { tz = "Europe/Madrid"; }
+      await s.setJSON(subKey(endpoint), {
+        endpoint, keys, tz,
+        deviceId: str(body.deviceId, 40),
+        name: str(body.name, 40),
+        changes: !!body.changes,
+        reminders: !!body.reminders,
+        updatedAt: Date.now(),
+      });
+      await s.delete("remcache");
+      return json({ ok: true });
+    }
+
+    if (route === "push/unsubscribe" && req.method === "POST") {
+      const body = await req.json();
+      if (typeof body.endpoint === "string") await s.delete(subKey(body.endpoint));
+      return json({ ok: true });
+    }
+
+    if (route === "push/test" && req.method === "POST") {
+      const body = await req.json();
+      const sub = typeof body.endpoint === "string" ? await s.get(subKey(body.endpoint), { type: "json" }) : null;
+      if (!sub) return json({ error: "Questo telefono non è iscritto alle notifiche" }, 400);
+      const ok = await sendPush({ ...(sub as object), _key: subKey(body.endpoint) }, {
+        title: "Notifiche attive ✓", body: "Da ora il calendario di famiglia ti avvisa qui.", url: "/", tag: "test",
+      });
+      return ok ? json({ ok: true }) : json({ error: "Invio non riuscito, riprova più tardi" }, 502);
     }
 
     // ---------- liste condivise: una chiave per voce (li/<lista>/<voce>) ----------
