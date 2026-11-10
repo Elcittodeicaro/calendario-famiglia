@@ -201,6 +201,56 @@ export default async (req: Request, context: Context) => {
       return json({ results });
     }
 
+    // ---------- messaggi: msg/<istante>-<id> ----------
+    if (route === "messages" && req.method === "GET") {
+      const since = Number(url.searchParams.get("since")) || 0;
+      const { blobs } = await s.list({ prefix: "msg/" });
+      let keys = blobs.map((b) => b.key).sort();
+      keys = since ? keys.filter((k) => Number(k.slice(4, 18)) > since) : keys.slice(-200);
+      const messages = (await Promise.all(keys.map(async (k) => {
+        const v = await s.get(k, { type: "json" });
+        return v ? { ...(v as object), _key: k } : null;
+      }))).filter(Boolean);
+      return json({ messages });
+    }
+
+    if (route === "messages" && req.method === "POST") {
+      const body = await req.json();
+      const text = str(body.text, 2000);
+      const r = body.ref;
+      const ref = r && r.type === "item" && typeof r.key === "string" && ITEM_KEY_RE.test(r.key)
+        ? { type: "item", key: r.key, text: str(r.text, 200) } : null;
+      if (!text && !ref) return json({ error: "Messaggio vuoto" }, 400);
+      let by = "";
+      try { by = decodeURIComponent(req.headers.get("x-nome") || "").slice(0, 40); } catch {}
+      const at = Date.now();
+      const msg = {
+        id: typeof body.id === "string" && ID_RE.test(body.id) ? body.id : randomUUID(),
+        text, ref, by: by || str(body.by, 40), deviceId: str(req.headers.get("x-device"), 40), at,
+      };
+      const key = `msg/${String(at).padStart(14, "0")}-${msg.id}`;
+      await s.setJSON(key, msg);
+      await later(context, (async () => {
+        const subs = (await listSubs()).filter((x: any) => x.messages && x.deviceId !== msg.deviceId);
+        await Promise.all(subs.map((sub: any) => sendPush(sub, {
+          title: `💬 ${msg.by || "Nuovo messaggio"}`,
+          body: [text, ref ? `☐ ${ref.text}` : ""].filter(Boolean).join("\n").slice(0, 300),
+          url: "/?v=chat",
+          tag: "chat",
+        })));
+      })());
+      return json({ ...msg, _key: key });
+    }
+
+    if (route === "messages" && req.method === "DELETE") {
+      const key = url.searchParams.get("key") || "";
+      if (!/^msg\/\d{14}-[a-z0-9-]{6,40}$/.test(key)) return json({ error: "Messaggio non valido" }, 400);
+      const msg = (await s.get(key, { type: "json" })) as any;
+      if (msg && msg.deviceId && msg.deviceId !== req.headers.get("x-device")) return json({ error: "Puoi eliminare solo i tuoi messaggi" }, 403);
+      await s.delete(key);
+      return json({ ok: true });
+    }
+
     // ---------- notifiche ----------
     if (route === "push/key" && req.method === "GET") {
       return json({ key: vapidPublicKey() });
@@ -220,6 +270,8 @@ export default async (req: Request, context: Context) => {
         name: str(body.name, 40),
         changes: !!body.changes,
         reminders: !!body.reminders,
+        messages: !!body.messages,
+        daily: !!body.daily,
         updatedAt: Date.now(),
       });
       await s.delete("remcache");

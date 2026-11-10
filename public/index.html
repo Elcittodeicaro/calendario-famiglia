@@ -16,6 +16,7 @@
 <link rel="icon" href="/icon-192.png">
 <style>
 :root{
+  --tabh:calc(58px + env(safe-area-inset-bottom));
   --bg:#f7f4ef;--card:#fff;--ink:#1d1b18;--muted:#8a847b;--line:#e8e2d8;--soft:#ece7df;
   --accent:#e03131;--sel:#1d1b18;--selInk:#fff;--ok:#34c759;
   color-scheme:light dark;
@@ -52,7 +53,7 @@ button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:poin
 .sync-dot{position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--ok);opacity:0;transition:opacity .2s}
 .syncing .sync-dot{opacity:1;animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.25}}
-.seg{display:grid;grid-template-columns:repeat(4,1fr);background:var(--soft);border-radius:10px;padding:3px;margin-top:10px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--soft);border-radius:10px;padding:3px;margin-top:10px}
 .seg button{padding:6px;border-radius:8px;font-size:15px;font-weight:600;color:var(--muted)}
 .seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 body[data-view=agenda] .nav{display:none}
@@ -138,7 +139,8 @@ a.btn-wide{text-decoration:none;color:inherit;box-sizing:border-box}
 .fchip small{font-size:12px;opacity:.7}
 
 /* ---------- liste ---------- */
-body[data-view=lists] .nav,body[data-view=lists] #todayBtn,body[data-view=lists] #searchBtn,body[data-view=lists] .filters,body[data-view=lists] .fab{display:none}
+body[data-view=lists] .nav,body[data-view=lists] #todayBtn,body[data-view=lists] #searchBtn,body[data-view=lists] .filters,body[data-view=lists] .fab,body[data-view=lists] .seg,
+body[data-view=chat] .nav,body[data-view=chat] #todayBtn,body[data-view=chat] #searchBtn,body[data-view=chat] .filters,body[data-view=chat] .fab,body[data-view=chat] .seg{display:none}
 .ls-wrap{padding:2px 14px 130px}
 .ls-tabs{display:flex;gap:6px;overflow-x:auto;margin:10px -14px 12px;padding:0 14px;scrollbar-width:none}
 .ls-tabs::-webkit-scrollbar{display:none}
@@ -158,11 +160,53 @@ body[data-view=lists] .nav,body[data-view=lists] #todayBtn,body[data-view=lists]
 .ls-actions{display:flex;gap:8px;margin-top:24px}
 .ls-actions button{flex:1;padding:11px;border-radius:12px;background:var(--soft);font-weight:600;font-size:15px}
 #promptForm .group{margin:6px 16px 4px}
+.day,.wk-wrap,.ag-wrap,.ls-wrap{padding-bottom:calc(var(--tabh) + 96px)!important}
+
+/* ---------- barra in basso ---------- */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:7;display:grid;grid-template-columns:repeat(3,1fr);background:var(--bg);border-top:1px solid var(--line);padding:6px 0 calc(env(safe-area-inset-bottom) + 4px)}
+@supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)){
+  .tabbar{background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+}
+.tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--muted);position:relative;padding:2px 0}
+.tabbar svg{width:25px;height:25px}
+.tabbar button.on{color:var(--ink)}
+.badge{position:absolute;top:-3px;left:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;font-style:normal}
+body.kb .tabbar{display:none}
+
+/* ---------- messaggi ---------- */
+.chat-wrap{padding:4px 12px calc(var(--tabh) + 96px)}
+.chat-day{text-align:center;font-size:12px;color:var(--muted);margin:16px 0 6px;font-weight:600}
+.msg{display:flex;flex-direction:column;align-items:flex-start;margin:3px 0}
+.msg.mine{align-items:flex-end}
+.msg-by{font-size:12px;color:var(--muted);margin:4px 12px 2px}
+.bubble{max-width:82%;background:var(--card);border-radius:18px 18px 18px 6px;padding:8px 12px 5px;box-shadow:0 1px 2px rgba(0,0,0,.07);cursor:pointer;text-align:left}
+.mine .bubble{background:var(--ink);color:var(--bg);border-radius:18px 18px 6px 18px}
+.msg.pending .bubble{opacity:.55}
+.msg-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:16px}
+.msg-time{display:block;text-align:right;font-size:11px;opacity:.6;margin-top:2px}
+.ref{display:flex;gap:10px;align-items:flex-start;background:var(--soft);color:var(--ink);border-radius:12px;padding:8px 10px;margin-top:6px}
+.mine .ref{background:var(--bg)}
+.ref .check{width:22px;height:22px;font-size:13px;border-color:var(--muted)}
+.ref.done .check{background:var(--ok);border-color:var(--ok)}
+.ref-txt{flex:1;min-width:0;font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.ref.done .ref-txt{text-decoration:line-through;color:var(--muted)}
+.ref.gone{font-size:14px;opacity:.7;display:block}
+.composer{position:fixed;left:0;right:0;bottom:calc(var(--tabh) + var(--kb,0px));z-index:6;background:var(--bg);border-top:1px solid var(--line);padding:8px 10px}
+body.kb .composer{bottom:var(--kb,0px);padding-bottom:8px}
+body:not([data-view=chat]) .composer{display:none}
+.composer-row{display:flex;align-items:flex-end;gap:8px}
+.composer textarea{flex:1;min-width:0;min-height:0;height:40px;width:auto;resize:none;border:0;border-radius:20px;background:var(--card);padding:9px 14px;font-size:16px;line-height:1.35;max-height:120px;outline:none;box-shadow:inset 0 0 0 1px var(--line);font-family:inherit;color:inherit}
+.c-btn,.c-send{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;flex:none}
+.c-btn{background:var(--soft)}
+.c-send{background:var(--ink);color:var(--bg)}
+.c-btn svg,.c-send svg{width:20px;height:20px}
+.ref-pending{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--soft);border-radius:12px;padding:6px 6px 6px 12px;margin-bottom:8px;font-size:14px;font-weight:600}
+.pick-row{width:100%}
 .ev-note{font-size:14px;color:var(--muted);margin-top:5px;white-space:pre-wrap;overflow-wrap:anywhere}
 .empty{color:var(--muted);text-align:center;padding:26px 10px;font-size:15px}
 .link{color:var(--ink);font-weight:600;margin-top:8px;padding:8px 14px;border-radius:99px;background:var(--soft)}
 
-.fab{position:fixed;right:18px;bottom:calc(env(safe-area-inset-bottom) + 18px);width:60px;height:60px;border-radius:50%;
+.fab{position:fixed;right:18px;bottom:calc(var(--tabh) + 14px);width:60px;height:60px;border-radius:50%;
   background:var(--ink);color:var(--bg);display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.25);z-index:6}
 .fab svg{width:28px;height:28px}
 .fab:active{transform:scale(.94)}
@@ -229,7 +273,7 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
 .login-card .btn-wide{width:100%;margin:14px 0 0}
 .err{color:#e03131;min-height:22px;font-size:14px;margin-top:10px}
 
-.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 92px);transform:translate(-50%,20px);background:var(--ink);color:var(--bg);
+.toast{position:fixed;left:50%;bottom:calc(var(--tabh) + 84px);transform:translate(-50%,20px);background:var(--ink);color:var(--bg);
   padding:10px 16px;border-radius:99px;font-size:15px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:40;max-width:90vw;text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 </style>
@@ -272,7 +316,6 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
       <button data-view="month">Mese</button>
       <button data-view="week">Settimana</button>
       <button data-view="agenda">Prossimi</button>
-      <button data-view="lists">Liste</button>
     </div>
     <div class="filters" id="filters"></div>
   </header>
@@ -300,6 +343,21 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
       <div id="listItems"></div>
     </section>
   </main>
+
+  <section id="chatView" class="chat-wrap" hidden><div id="chatList"></div></section>
+  <form id="chatForm" class="composer" autocomplete="off">
+    <div id="chatRef" class="ref-pending" hidden></div>
+    <div class="composer-row">
+      <button type="button" class="c-btn" id="chatAttach" aria-label="Allega una cosa da fare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg></button>
+      <textarea name="msg" rows="1" placeholder="Scrivi un messaggio…" enterkeyhint="send" maxlength="2000" autocapitalize="sentences"></textarea>
+      <button type="submit" class="c-send" aria-label="Invia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    </div>
+  </form>
+  <nav class="tabbar" id="tabbar">
+    <button data-tab="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calendario</span></button>
+    <button data-tab="lists"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg><span>Liste</span></button>
+    <button data-tab="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span>Messaggi</span><b class="badge" id="chatBadge" hidden></b></button>
+  </nav>
 
   <button class="fab" id="addBtn" aria-label="Nuovo impegno"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 </div>
@@ -377,8 +435,18 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
     <div class="label">Chi se ne occupa</div>
     <div class="group"><div class="who" id="itemCare"></div></div>
     <div class="meta" id="itemMeta"></div>
+    <button type="button" class="btn-wide" id="itemMsg">💬 Scrivi un messaggio su questa voce</button>
     <button type="button" class="btn-wide danger" id="itemDel">Elimina</button>
   </form>
+</div>
+
+<!-- ALLEGA UNA COSA DA FARE -->
+<div class="overlay" id="pickSheet">
+  <div class="sheet">
+    <div class="sheet-head"><button type="button" class="l" data-close>Annulla</button><h3>Allega da fare</h3><span></span></div>
+    <button type="button" class="btn-wide" id="pickNew">+ Nuova cosa da fare</button>
+    <div id="pickList" class="sr"></div>
+  </div>
 </div>
 
 <!-- SCELTA / CONFERMA -->
@@ -423,7 +491,9 @@ textarea{width:100%;border:0;background:transparent;padding:12px 14px;min-height
     <div class="group">
       <div class="row"><span class="grow" id="pushInfo" style="color:var(--muted);font-size:14px"></span></div>
       <label class="row"><span class="grow">Quando l'altro aggiunge, cambia o elimina un impegno</span><input type="checkbox" class="switch" id="pushChanges"></label>
+      <label class="row"><span class="grow">Nuovi messaggi</span><input type="checkbox" class="switch" id="pushMessages"></label>
       <label class="row"><span class="grow">Promemoria prima degli impegni</span><input type="checkbox" class="switch" id="pushReminders"></label>
+      <label class="row"><span class="grow">Riepilogo della giornata alle 8</span><input type="checkbox" class="switch" id="pushDaily"></label>
     </div>
     <div class="hint">I promemoria seguono il campo «Avviso» di ogni impegno. Se ricevi già gli avvisi dal Calendario dell'iPhone, lasciali spenti qui per non averli doppi.</div>
     <button type="button" class="btn-wide" id="pushTest" hidden>Invia una notifica di prova</button>
@@ -502,6 +572,7 @@ const st = {
   view: ls.get('vista', 'month'),
   filter: ls.get('filtro', ''),
   lists: DEFAULT_LISTS, items: [], listId: ls.get('lista', ''), listBusy: 0, spans: {},
+  msgs: [], msgSince: 0, chatRef: null,
   y: now.getFullYear(), m: now.getMonth(), sel: todayStr(),
   months: {}, rec: [], settings: DEFAULT_SETTINGS,
   loaded: new Set(),
@@ -510,8 +581,9 @@ const cached = ls.get('dati', null);
 if (cached && st.code) {
   st.months = cached.months || {}; st.rec = cached.rec || []; st.settings = cached.settings || DEFAULT_SETTINGS;
   st.lists = cached.lists || DEFAULT_LISTS; st.items = cached.items || []; st.spans = cached.spans || {};
+  st.msgs = cached.msgs || []; st.msgSince = st.msgs.reduce((m, x) => Math.max(m, x.at || 0), 0);
 }
-const persist = () => ls.set('dati', { months: st.months, rec: st.rec, spans: st.spans, settings: st.settings, lists: st.lists, items: st.items });
+const persist = () => ls.set('dati', { months: st.months, rec: st.rec, spans: st.spans, settings: st.settings, lists: st.lists, items: st.items, msgs: (st.msgs || []).filter(m => !m.pending).slice(-200) });
 
 // ---------- server ----------
 const deviceId = (() => {
@@ -540,7 +612,8 @@ function neededMonths() {
 }
 let inflight = 0, lastOffline = 0;
 async function load(force = false) {
-  if (st.view === 'lists') return loadLists();
+  loadMessages(); // sempre: tiene aggiornato il numero dei non letti
+  if (st.view === 'lists' || st.view === 'chat') return loadLists();
   const want = neededMonths().filter(k => force || !st.loaded.has(k));
   if (!want.length || !st.code) return;
   inflight++; document.body.classList.add('syncing');
@@ -750,7 +823,11 @@ function render() {
   $('#weekView').hidden = st.view !== 'week';
   $('#agendaView').hidden = st.view !== 'agenda';
   $('#listsView').hidden = st.view !== 'lists';
+  $('#chatView').hidden = st.view !== 'chat';
+  $$('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.tab === (st.view === 'lists' || st.view === 'chat' ? st.view : 'cal')));
+  updateBadge();
   if (st.view === 'lists') return renderLists();
+  if (st.view === 'chat') return renderChat(false);
   renderFilters();
   if (st.view === 'month') renderMonth(); else if (st.view === 'week') renderWeek(); else renderAgenda();
 }
@@ -784,7 +861,14 @@ $('#todayBtn').onclick = () => {
   const t = new Date(); st.y = t.getFullYear(); st.m = t.getMonth(); st.sel = todayStr();
   render(); load(); window.scrollTo({ top: 0, behavior: 'smooth' });
 };
-$$('.seg button').forEach(b => b.onclick = () => { st.view = b.dataset.view; ls.set('vista', st.view); render(); load(); window.scrollTo(0, 0); });
+$$('.seg button').forEach(b => b.onclick = () => { st.view = b.dataset.view; ls.set('vista', st.view); ls.set('vistaCal', st.view); render(); load(); window.scrollTo(0, 0); });
+$$('#tabbar button').forEach(b => b.onclick = () => {
+  const tab = b.dataset.tab;
+  st.view = tab === 'cal' ? ls.get('vistaCal', 'month') : tab;
+  ls.set('vista', st.view);
+  if (tab === 'chat') { st.msgSince = 0; render(); loadMessages(); loadLists(); scrollChatEnd(); return; }
+  render(); load(); window.scrollTo(0, 0);
+});
 $('#grid').addEventListener('click', e => {
   const c = e.target.closest('.cell'); if (!c) return;
   const d = c.dataset.d, dd = pd(d);
@@ -991,6 +1075,7 @@ async function loadLists() {
     const d = await api('lists');
     if (st.listBusy === 0) { st.lists = d.lists || DEFAULT_LISTS; st.items = d.items || []; persist(); }
     if (!anySheetOpen() && st.view === 'lists') renderLists();
+    else if (!anySheetOpen() && st.view === 'chat') renderChat(false);
   } catch (err) {
     if (err.auth) return logout('Il codice non è più valido.');
     if (Date.now() - lastOffline > 120000) { lastOffline = Date.now(); toast('Offline: vedi gli ultimi dati salvati'); }
@@ -1102,7 +1187,7 @@ $('#listsView').addEventListener('click', e => {
 
 // ---------- editor della voce (scadenza, chi se ne occupa) ----------
 const IF = $('#itemForm');
-let itemEditing = null, itemCare = new Set();
+let itemEditing = null, itemCare = new Set(), itemAttach = false;
 function openItem(item, preset = {}) {
   itemEditing = item || null;
   $('#itemTitle').textContent = item ? 'Modifica' : 'Nuova cosa da fare';
@@ -1115,6 +1200,8 @@ function openItem(item, preset = {}) {
   $('#itemCare').innerHTML = pickHtml(itemCare);
   $('#dueTimeRow').hidden = !IF.due.value;
   $('#itemDel').hidden = !item;
+  $('#itemMsg').hidden = !item;
+  itemAttach = !!preset.attach;
   $('#itemMeta').textContent = item && item.by ? `Aggiunta da ${item.by}` : '';
   openSheet($('#itemSheet'));
   IF.scrollTop = 0;
@@ -1145,6 +1232,7 @@ IF.addEventListener('submit', e => {
     const id = newId();
     const item = { id, ...data, done: false, by: st.me, createdAt: Date.now(), doneAt: 0, _key: `li/${list}/${id}` };
     listOp(() => st.items.push(item), () => saveItem(item));
+    if (itemAttach) { setChatRef(item); setTimeout(() => $('#chatForm').msg.focus(), 300); return; }
   }
   if (data.due) toast('Salvato ✓ — lo trovi anche nel calendario');
 });
@@ -1158,6 +1246,156 @@ $('#addDetailed').onclick = () => {
   input.value = '';
   openItem(null, { text, list: curList(), due: todayStr() });
 };
+
+// ---------- messaggi ----------
+const seenAt = () => ls.get('chatSeen', 0);
+const unreadCount = () => { const s = seenAt(); return st.msgs.filter(m => m.deviceId !== deviceId && m.at > s).length; };
+function updateBadge() {
+  const n = st.view === 'chat' ? 0 : unreadCount(), b = $('#chatBadge');
+  b.textContent = n > 9 ? '9+' : String(n); b.hidden = !n;
+}
+function markSeen() {
+  if (st.view !== 'chat' || document.visibilityState !== 'visible' || !st.msgs.length) return;
+  ls.set('chatSeen', Math.max(seenAt(), ...st.msgs.map(m => m.at || 0)));
+  updateBadge();
+}
+const scrollChatEnd = () => requestAnimationFrame(() => window.scrollTo(0, document.documentElement.scrollHeight));
+const nearEnd = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160;
+let msgBusy = false;
+async function loadMessages() {
+  if (msgBusy || !st.code) return;
+  msgBusy = true;
+  try {
+    const full = !st.msgSince;
+    const { messages } = await api('messages' + (full ? '' : '?since=' + Math.max(0, st.msgSince - 600000)));
+    let added = 0;
+    if (full) { const pending = st.msgs.filter(m => m.pending); added = messages.filter(m => !st.msgs.some(x => x._key === m._key)).length; st.msgs = [...messages, ...pending]; }
+    else for (const m of messages) if (!st.msgs.some(x => x._key === m._key)) { st.msgs.push(m); added++; }
+    st.msgs.sort((a, b) => a.at - b.at);
+    for (const m of messages) st.msgSince = Math.max(st.msgSince, m.at || 0);
+    if (full && !messages.length) st.msgSince = 1;
+    persist(); updateBadge();
+    if (st.view === 'chat' && !anySheetOpen() && (added || full)) { const end = nearEnd(); renderChat(false); if (end || added) scrollChatEnd(); }
+    if (added && st.view === 'chat') loadLists(); // aggiorna lo stato delle cose da fare allegate
+  } catch (err) {
+    if (err.auth) logout('Il codice non è più valido.');
+  } finally { msgBusy = false; }
+}
+function chatDay(d) {
+  const t = todayStr();
+  if (d === t) return 'Oggi';
+  if (d === addDays(t, -1)) return 'Ieri';
+  const x = pd(d);
+  return `${cap(WD[x.getDay()])} ${x.getDate()} ${MONTHS[x.getMonth()]}`;
+}
+function refItem(ref) {
+  const id = ref.key.split('/')[2];
+  return st.items.find(i => i._key === ref.key || i.id === id);
+}
+function refHtml(ref) {
+  const it = refItem(ref);
+  if (!it) return `<div class="ref gone">☐ ${esc(ref.text)} · non è più in lista</div>`;
+  return `<div class="ref${it.done ? ' done' : ''}" data-ref="${esc(it._key)}"><span class="check" data-rcheck role="button" aria-label="Fatto">${it.done ? '✓' : ''}</span><span class="ref-txt">${esc(it.text)}${itemSub(it)}</span></div>`;
+}
+function renderChat(scrollEnd) {
+  $('#monthTitle').innerHTML = 'Messaggi';
+  if (!st.msgs.length) {
+    $('#chatList').innerHTML = '<div class="empty">Ancora nessun messaggio.<br>Scrivi qui sotto: col pulsante a sinistra puoi allegare una cosa da fare.</div>';
+  } else {
+    let html = '', lastDay = '';
+    for (const m of st.msgs) {
+      const t = new Date(m.at), day = ds(t), mine = m.deviceId === deviceId;
+      if (day !== lastDay) { html += `<div class="chat-day">${esc(chatDay(day))}</div>`; lastDay = day; }
+      html += `<div class="msg${mine ? ' mine' : ''}${m.pending ? ' pending' : ''}" data-msg="${esc(m._key)}">
+        ${mine ? '' : `<div class="msg-by">${esc(m.by || '')}</div>`}
+        <div class="bubble">${m.text ? `<div class="msg-text">${esc(m.text)}</div>` : ''}${m.ref ? refHtml(m.ref) : ''}<span class="msg-time">${pad(t.getHours())}:${pad(t.getMinutes())}</span></div></div>`;
+    }
+    $('#chatList').innerHTML = html;
+  }
+  if (scrollEnd) scrollChatEnd();
+  markSeen();
+}
+function setChatRef(it) {
+  st.chatRef = it || null;
+  const el = $('#chatRef');
+  el.hidden = !it;
+  el.innerHTML = it ? `<span>☐ ${esc(it.text)}</span><button type="button" class="xbtn" id="chatRefX" aria-label="Togli">✕</button>` : '';
+}
+$('#chatRef').addEventListener('click', e => { if (e.target.closest('#chatRefX')) setChatRef(null); });
+const CF = $('#chatForm');
+function autoGrow() { const t = CF.msg; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 120) + 'px'; }
+CF.msg.addEventListener('input', autoGrow);
+CF.msg.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); CF.requestSubmit ? CF.requestSubmit() : CF.dispatchEvent(new Event('submit', { cancelable: true })); }
+});
+CF.addEventListener('submit', async e => {
+  e.preventDefault();
+  const text = CF.msg.value.trim(), it = st.chatRef;
+  if (!text && !it) return;
+  const id = newId(), ref = it ? { type: 'item', key: it._key, text: it.text } : null;
+  const tmp = { id, text, ref, by: st.me, deviceId, at: Date.now(), _key: 'tmp-' + id, pending: true };
+  st.msgs.push(tmp); CF.msg.value = ''; autoGrow(); setChatRef(null);
+  renderChat(true);
+  try {
+    const saved = await api('messages', { method: 'POST', body: JSON.stringify({ id, text, ref }) });
+    Object.assign(tmp, saved); delete tmp.pending;
+    persist(); renderChat(false);
+  } catch (err) {
+    st.msgs = st.msgs.filter(m => m !== tmp); CF.msg.value = text; autoGrow(); if (it) setChatRef(it);
+    renderChat(false);
+    if (err.auth) return logout('Il codice non è più valido.');
+    toast(netMsg(err));
+  }
+});
+$('#chatList').addEventListener('click', e => {
+  const refEl = e.target.closest('[data-ref]');
+  if (refEl) {
+    const it = st.items.find(i => i._key === refEl.dataset.ref); if (!it) return;
+    if (e.target.closest('[data-rcheck]')) return listOp(() => { it.done = !it.done; it.doneAt = it.done ? Date.now() : 0; }, () => saveItem({ ...it }));
+    return openItem(it);
+  }
+  const box = e.target.closest('[data-msg]'); if (!box) return;
+  const m = st.msgs.find(x => x._key === box.dataset.msg); if (!m || m.pending) return;
+  const opts = [];
+  if (m.text) opts.push({ label: 'Crea una cosa da fare', act: () => openItem(null, { text: m.text.slice(0, 200), list: curList() }) });
+  if (m.deviceId === deviceId) opts.push({ label: 'Elimina messaggio', danger: true, act: async () => {
+    const before = st.msgs; st.msgs = st.msgs.filter(x => x !== m); renderChat(false);
+    try { await api('messages?key=' + encodeURIComponent(m._key), { method: 'DELETE' }); persist(); }
+    catch (err) { st.msgs = before; renderChat(false); toast(netMsg(err)); }
+  } });
+  if (opts.length) choose(m.text ? `"${m.text.length > 60 ? m.text.slice(0, 60) + '…' : m.text}"` : 'Messaggio', opts);
+});
+$('#chatAttach').onclick = () => {
+  const open = st.items.filter(i => !i.done);
+  $('#pickList').innerHTML = open.length ? st.lists.map(l => {
+    const rows = open.filter(i => i.list === l.id);
+    return rows.length ? `<h3 class="ag-day">${esc(l.name)}</h3><div class="items">${rows.map(i => `<button class="item pick-row" data-pick="${esc(i._key)}"><span class="txt">${esc(i.text)}${itemSub(i)}</span></button>`).join('')}</div>` : '';
+  }).join('') : '<div class="empty">Nessuna cosa da fare aperta.</div>';
+  openSheet($('#pickSheet'));
+};
+$('#pickList').addEventListener('click', e => {
+  const b = e.target.closest('[data-pick]'); if (!b) return;
+  const it = st.items.find(i => i._key === b.dataset.pick); if (!it) return;
+  closeSheet($('#pickSheet')); setChatRef(it); setTimeout(() => CF.msg.focus(), 250);
+});
+$('#pickNew').onclick = () => { closeSheet($('#pickSheet')); openItem(null, { list: curList(), attach: true }); };
+$('#itemMsg').onclick = () => {
+  const it = itemEditing; if (!it) return;
+  $$('.overlay.open').forEach(o => o.classList.remove('open')); document.body.classList.remove('locked');
+  st.view = 'chat'; ls.set('vista', 'chat'); render(); setChatRef(it); scrollChatEnd();
+  setTimeout(() => CF.msg.focus(), 300);
+};
+// La tastiera dell'iPhone copre gli elementi fissi: sposta la barra di scrittura sopra
+(() => {
+  const vv = window.visualViewport; if (!vv) return;
+  const onVV = () => {
+    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty('--kb', kb + 'px');
+    document.body.classList.toggle('kb', kb > 80);
+  };
+  vv.addEventListener('resize', onVV); vv.addEventListener('scroll', onVV);
+})();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') markSeen(); });
 
 // ---------- ricerca ----------
 let searchT = null, searchSeq = 0;
@@ -1198,7 +1436,9 @@ const pushOK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notif
 const standalone = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 let vapidKey = '';
-const pushPrefs = () => ls.get('push', { changes: false, reminders: false });
+const pushPrefs = () => ls.get('push', { changes: false, reminders: false, messages: false, daily: false });
+const anyPush = p => !!(p.changes || p.reminders || p.messages || p.daily);
+const PUSH_IDS = { changes: '#pushChanges', messages: '#pushMessages', reminders: '#pushReminders', daily: '#pushDaily' };
 const tzName = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } };
 function b64ToBytes(b64) {
   const raw = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
@@ -1211,8 +1451,8 @@ async function currentSub() {
 }
 const subscribeBody = (sub, p) => JSON.stringify({ subscription: sub.toJSON(), deviceId, name: st.me, tz: tzName(), ...p });
 function pushUI() {
-  const p = pushPrefs(), ch = $('#pushChanges'), re = $('#pushReminders');
-  ch.checked = !!p.changes; re.checked = !!p.reminders;
+  const p = pushPrefs();
+  for (const [k, sel] of Object.entries(PUSH_IDS)) $(sel).checked = !!p[k];
   let info, disabled = false;
   if (!pushOK) {
     disabled = true;
@@ -1221,17 +1461,18 @@ function pushUI() {
     disabled = true;
     info = 'Notifiche bloccate: riattivale in Impostazioni › Notifiche › Calendario.';
   } else {
-    info = (p.changes || p.reminders) && Notification.permission === 'granted' ? 'Notifiche attive su questo telefono.' : 'Scegli quali notifiche ricevere su questo telefono.';
+    info = anyPush(p) && Notification.permission === 'granted' ? 'Notifiche attive su questo telefono.' : 'Scegli quali notifiche ricevere su questo telefono.';
   }
   $('#pushInfo').textContent = info;
-  ch.disabled = re.disabled = disabled;
-  $('#pushTest').hidden = !(pushOK && Notification.permission === 'granted' && (p.changes || p.reminders));
+  for (const sel of Object.values(PUSH_IDS)) $(sel).disabled = disabled;
+  $('#pushTest').hidden = !(pushOK && Notification.permission === 'granted' && anyPush(p));
   if (pushOK && !vapidKey) api('push/key').then(d => { vapidKey = d.key || ''; }).catch(() => {});
 }
 async function applyPush() {
-  const p = { changes: $('#pushChanges').checked, reminders: $('#pushReminders').checked };
+  const p = {};
+  for (const [k, sel] of Object.entries(PUSH_IDS)) p[k] = $(sel).checked;
   try {
-    if (!p.changes && !p.reminders) {
+    if (!anyPush(p)) {
       const sub = await currentSub();
       if (sub) {
         await api('push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: sub.endpoint }) }).catch(() => {});
@@ -1257,6 +1498,8 @@ async function applyPush() {
 }
 $('#pushChanges').onchange = applyPush;
 $('#pushReminders').onchange = applyPush;
+$('#pushMessages').onchange = applyPush;
+$('#pushDaily').onchange = applyPush;
 $('#pushTest').onclick = async () => {
   try {
     const sub = await currentSub();
@@ -1267,7 +1510,8 @@ $('#pushTest').onclick = async () => {
 };
 async function refreshPush() { // all'avvio tiene aggiornata l'iscrizione (nome, fuso, preferenze)
   const p = pushPrefs();
-  if (!pushOK || !(p.changes || p.reminders) || Notification.permission !== 'granted') return;
+  if (!pushOK || !anyPush(p) || Notification.permission !== 'granted') return;
+  if (p.messages === undefined) { p.messages = true; p.daily = true; ls.set('push', p); } // chi aveva già le notifiche riceve anche le novità
   try { const sub = await currentSub(); if (sub) await api('push/subscribe', { method: 'POST', body: subscribeBody(sub, p) }); } catch {}
 }
 
@@ -1337,7 +1581,7 @@ function showLogin(msg) {
 }
 function logout(msg) {
   ls.del('codice'); ls.del('dati');
-  st.code = ''; st.months = {}; st.rec = []; st.loaded = new Set(); st.items = []; st.lists = DEFAULT_LISTS;
+  st.code = ''; st.months = {}; st.rec = []; st.loaded = new Set(); st.items = []; st.lists = DEFAULT_LISTS; st.msgs = []; st.msgSince = 0; ls.del('chatSeen');
   $$('.overlay.open').forEach(o => o.classList.remove('open')); document.body.classList.remove('locked');
   showLogin(msg);
 }
@@ -1358,12 +1602,12 @@ L.addEventListener('submit', async e => {
 });
 function start() {
   $('#login').hidden = true; $('#app').hidden = false;
-  const d = new URLSearchParams(location.search).get('d');
-  if (d) {
-    selectDate(d);
-    try { const u = new URL(location.href); u.searchParams.delete('d'); history.replaceState(null, '', u); } catch {}
-  }
+  const qs = new URLSearchParams(location.search), d = qs.get('d');
+  if (d) selectDate(d);
+  if (qs.get('v') === 'chat') st.view = 'chat';
+  if (d || qs.get('v')) { try { const u = new URL(location.href); u.searchParams.delete('d'); u.searchParams.delete('v'); history.replaceState(null, '', u); } catch {} }
   render(); load(true); refreshPush();
+  if (st.view === 'chat') scrollChatEnd();
 }
 function selectDate(d) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
@@ -1373,8 +1617,10 @@ function selectDate(d) {
 }
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => {
   if (!e.data || e.data.type !== 'open') return;
-  const d = new URL(e.data.url, location.origin).searchParams.get('d');
-  if (d && selectDate(d)) { $$('.overlay.open').forEach(o => o.classList.remove('open')); document.body.classList.remove('locked'); render(); load(); }
+  const u = new URL(e.data.url, location.origin), d = u.searchParams.get('d');
+  const closeAll = () => { $$('.overlay.open').forEach(o => o.classList.remove('open')); document.body.classList.remove('locked'); };
+  if (u.searchParams.get('v') === 'chat') { closeAll(); st.view = 'chat'; render(); loadMessages(); scrollChatEnd(); }
+  else if (d && selectDate(d)) { closeAll(); render(); load(); }
 });
 
 // ---------- aggiornamento automatico ----------
@@ -1394,6 +1640,7 @@ async function checkUpdate() {
   } catch {}
 }
 setInterval(() => { if (st.code && document.visibilityState === 'visible' && !anySheetOpen()) load(true); }, 30000);
+setInterval(() => { if (st.code && st.view === 'chat' && document.visibilityState === 'visible') loadMessages(); }, 8000);
 setInterval(() => { if (document.visibilityState === 'visible') checkUpdate(); }, 300000);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
